@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Head-Coupled Parallax — Woodland Diorama</title>
+<style>
+  :root {
+    --bg: #1a1f1a;
+    --cream: #f2ead9;
+    --moss: #6b8f5e;
+    --fern: #4a6b48;
+    --deep: #2f4a32;
+    --coral: #e08a6b;
+    --gold: #e8c47a;
+    --amber: #d9913f;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    color: var(--cream);
+    overflow: hidden;
+  }
+
+  /* The "window" — the diorama is viewed through this fixed frame */
+  #stage {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    perspective: 650px;       /* shorter = stronger, more dramatic depth */
+    perspective-origin: 50% 50%;
+  }
+
+  #world {
+    position: relative;
+    width: min(90vw, 1100px);
+    height: min(80vh, 700px);
+    transform-style: preserve-3d;
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255,255,255,0.04);
+    background: linear-gradient(180deg, #cfe0c4 0%, #b7d0aa 38%, #9bbf8d 100%);
+  }
+
+  /* Each depth layer. translateZ sets how "deep" it sits in the box;
+     the JS shifts each by an amount proportional to its depth. */
+  .layer {
+    position: absolute;
+    inset: -22% ;            /* larger overscan so bigger shifts never reveal gaps */
+    will-change: transform;
+    transform-style: preserve-3d;
+  }
+
+  .layer svg { width: 100%; height: 100%; display: block; }
+
+  /* Floating UI */
+  #hud {
+    position: fixed;
+    left: 16px; top: 16px;
+    font-size: 12px;
+    line-height: 1.5;
+    background: rgba(0,0,0,0.45);
+    padding: 12px 14px;
+    border-radius: 10px;
+    backdrop-filter: blur(6px);
+    max-width: 280px;
+    z-index: 20;
+  }
+  #hud b { color: var(--gold); letter-spacing: 0.04em; }
+  #hud .status { color: var(--moss); }
+  #hud .status.live { color: #8fe08f; }
+  #hud .status.err { color: var(--coral); }
+
+  #controls {
+    position: fixed;
+    right: 16px; top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 20;
+  }
+  button {
+    font-family: inherit;
+    font-size: 12px;
+    color: var(--cream);
+    background: rgba(0,0,0,0.5);
+    border: 1px solid rgba(242,234,217,0.25);
+    padding: 9px 13px;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  button:hover { background: rgba(0,0,0,0.72); border-color: var(--gold); }
+  button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  /* tiny webcam preview, mostly for debugging the tracking */
+  #camWrap {
+    position: fixed;
+    right: 16px; bottom: 16px;
+    width: 160px; height: 120px;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(242,234,217,0.2);
+    background: #000;
+    z-index: 20;
+    opacity: 0.85;
+  }
+  #camWrap.hidden { display: none; }
+  #cam { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+  #dot {
+    position: absolute; width: 10px; height: 10px;
+    margin: -5px 0 0 -5px;
+    border-radius: 50%; background: var(--gold);
+    box-shadow: 0 0 8px var(--gold);
+    left: 50%; top: 50%;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .layer { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+  <div id="hud">
+    <div><b>HEAD-COUPLED PARALLAX</b></div>
+    <div style="margin-top:6px">Move your head left / right / up / down. The diorama shifts like a window into a small world.</div>
+    <div style="margin-top:8px">Status: <span id="status" class="status">click "Start camera"</span></div>
+  </div>
+
+  <div id="controls">
+    <button id="startBtn">Start camera</button>
+    <button id="camToggle">Hide webcam</button>
+    <button id="strengthBtn">Effect: Medium</button>
+  </div>
+
+  <div id="stage">
+    <div id="world"><!-- layers injected by JS --></div>
+  </div>
+
+  <div id="camWrap">
+    <video id="cam" autoplay playsinline muted></video>
+    <div id="dot"></div>
+  </div>
+
+<script type="module">
+/* ------------------------------------------------------------------
+   HEAD-COUPLED PERSPECTIVE (a.k.a. "window into a world" effect)
+
+   How it works:
+   1. MediaPipe FaceLandmarker reads your head position from the webcam.
+   2. We take the nose-tip x/y (normalized 0..1) as the "viewer position."
+   3. Each scene layer has a DEPTH value. We translate every layer by an
+      amount proportional to (viewerOffset * depth). Near layers (high
+      depth) move a lot; far layers (low depth) barely move. That
+      differential is what your eye reads as real 3D parallax.
+   4. We also tilt the whole #world box slightly toward the viewer for a
+      stronger volumetric feel.
+
+   ASSET-REGISTRY READY:
+   The LAYERS array below is the same shape as your snail-scene registry.
+   Each entry has { id, depth, svg }. Swap `svg` for an <img src="...png">
+   of a BiRefNet-cut asset and it parallaxes automatically by its depth.
+------------------------------------------------------------------- */
+
+// ---- 1. THE SCENE REGISTRY ----------------------------------------
+// depth: 0 = far background (moves least), 1 = near foreground (moves most)
+const LAYERS = [
+  {
+    id: "sky",
+    depth: 0.0,
+    svg: `<svg viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid slice">
+      <rect width="1000" height="700" fill="#cfe0c4"/>
+      <circle cx="780" cy="150" r="90" fill="#f4e7c4" opacity="0.7"/>
+      <circle cx="780" cy="150" r="140" fill="#f4e7c4" opacity="0.25"/>
+    </svg>`
+  },
+  {
+    id: "far-hills",
+    depth: 0.18,
+    svg: `<svg viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid slice">
+      <path d="M0 430 Q 250 330 500 420 T 1000 410 V700 H0 Z" fill="#a9c79b"/>
+      <path d="M0 480 Q 300 400 620 470 T 1000 460 V700 H0 Z" fill="#8fb682"/>
+    </svg>`
+  },
+  {
+    id: "mid-foliage",
+    depth: 0.42,
+    svg: `<svg viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid slice">
+      <g fill="#6b8f5e">
+        <ellipse cx="120" cy="560" rx="180" ry="120"/>
+        <ellipse cx="880" cy="540" rx="200" ry="140"/>
+        <ellipse cx="500" cy="610" rx="240" ry="120"/>
+      </g>
+      <g fill="#5a7d4f" opacity="0.85">
+        <ellipse cx="300" cy="600" rx="150" ry="90"/>
+        <ellipse cx="720" cy="600" rx="160" ry="100"/>
+      </g>
+    </svg>`
+  },
+  {
+    id: "rock",
+    depth: 0.62,
+    svg: `<svg viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid slice">
+      <ellipse cx="500" cy="560" rx="300" ry="150" fill="#7d7466"/>
+      <ellipse cx="500" cy="540" rx="300" ry="150" fill="#8d8676"/>
+      <ellipse cx="430" cy="510" rx="120" ry="55" fill="#6b8f5e" opacity="0.8"/>
+      <ellipse cx="600" cy="525" rx="90" ry="40" fill="#6b8f5e" opacity="0.7"/>
+    </svg>`
+  },
+  {
+    id: "snail",        // <-- your protagonist. Swap svg for the cut PNG later.
+    depth: 0.82,
+    svg: `<svg viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid slice">
+      <g transform="translate(470 470)">
+        <path d="M0 40 Q -40 40 -55 20 Q -70 0 -40 -8 L 60 -8 Q 80 -8 80 12 Q 80 40 50 40 Z" fill="#c9c0ad"/>
+        <line x1="-50" y1="-6" x2="-66" y2="-34" stroke="#c9c0ad" stroke-width="4" stroke-linecap="round"/>
+        <line x1="-40" y1="-6" x2="-50" y2="-36" stroke="#c9c0ad" stroke-width="4" stroke-linecap="round"/>
+        <circle cx="-67" cy="-36" r="4" fill="#5a4a3a"/>
+        <circle cx="-51" cy="-38" r="4" fill="#5a4a3a"/>
+        <circle cx="28" cy="6" r="42" fill="#d9913f"/>
+        <circle cx="28" cy="6" r="42" fill="none" stroke="#b9732a" stroke-width="6"/>
+        <path d="M28 6 m 0 -30 a 30 30 0 1 1 -0.1 0 M28 6 m 0 -18 a 18 18 0 1 1 -0.1 0 M28 6 m 0 -7 a 7 7 0 1 1 -0.1 0"
+              fill="none" stroke="#e8c47a" stroke-width="4"/>
+      </g>
+    </svg>`
+  },
+  {
+    id: "near-leaves",
+    depth: 1.0,
+    svg: `<svg viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid slice">
+      <g fill="#3f5e3c">
+        <ellipse cx="60" cy="660" rx="160" ry="110"/>
+        <ellipse cx="960" cy="650" rx="170" ry="120"/>
+      </g>
+      <g fill="#4a6b48">
+        <path d="M-20 700 Q 80 540 180 700 Z"/>
+        <path d="M1020 700 Q 920 530 820 700 Z"/>
+      </g>
+    </svg>`
+  },
+];
+
+// ---- 2. BUILD THE DOM ---------------------------------------------
+const world = document.getElementById("world");
+const layerEls = LAYERS.map(cfg => {
+  const el = document.createElement("div");
+  el.className = "layer";
+  el.dataset.depth = cfg.depth;
+  el.style.zIndex = Math.round(cfg.depth * 100);
+  el.innerHTML = cfg.svg;
+  world.appendChild(el);
+  return el;
+});
+
+// ---- 3. PARALLAX MATH ---------------------------------------------
+// viewer position is smoothed; we lerp toward the target each frame.
+let targetX = 0.5, targetY = 0.5;   // normalized nose position
+let curX = 0.5, curY = 0.5;
+let haveFace = false;
+
+const STRENGTH_LEVELS = { Low: 90, Medium: 180, High: 320 };
+let strengthName = "Medium";
+
+// Amplify the raw head input: your nose only travels a small band of the
+// frame, so we expand deviations from center before using them.
+const INPUT_GAIN = 2.4;
+
+function renderFrame() {
+  // higher factor = snappier / less lag (was 0.15)
+  curX += (targetX - curX) * 0.4;
+  curY += (targetY - curY) * 0.4;
+
+  // offset from center, amplified so small head movements read big.
+  // clamp so extreme moves don't fling layers off-frame.
+  let ox = (curX - 0.5) * INPUT_GAIN;
+  let oy = (curY - 0.5) * INPUT_GAIN;
+  ox = Math.max(-0.6, Math.min(0.6, ox));
+  oy = Math.max(-0.6, Math.min(0.6, oy));
+  const amp = STRENGTH_LEVELS[strengthName];
+
+  for (const el of layerEls) {
+    const d = parseFloat(el.dataset.depth);
+    // near layers (d~1) shift most; far layers (d~0) barely move.
+    // invert X so moving head right reveals the right side (window logic).
+    const tx = -ox * amp * d;
+    const ty = -oy * amp * d * 0.7;        // vertical a touch gentler
+    const tz = d * 120;                       // push near layers toward viewer
+    el.style.transform = `translate3d(${tx}px, ${ty}px, ${tz}px)`;
+  }
+
+  // subtle whole-box tilt toward the viewer = stronger volumetric feel
+  const rotY = ox * 16;     // degrees
+  const rotX = -oy * 13;
+  world.style.transform = `rotateY(${rotY}deg) rotateX(${rotX}deg)`;
+
+  // debug dot
+  dot.style.left = (curX * 100) + "%";
+  dot.style.top = (curY * 100) + "%";
+
+  requestAnimationFrame(renderFrame);
+}
+requestAnimationFrame(renderFrame);
+
+// ---- 4. MEDIAPIPE FACE TRACKING -----------------------------------
+const statusEl = document.getElementById("status");
+const dot = document.getElementById("dot");
+const cam = document.getElementById("cam");
+
+let faceLandmarker = null;
+let running = false;
+
+async function startCamera() {
+  statusEl.textContent = "loading model…";
+  statusEl.className = "status";
+  try {
+    const vision = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs");
+    const { FaceLandmarker, FilesetResolver } = vision;
+    const filesetResolver = await FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+    );
+    faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+      baseOptions: {
+        modelAssetPath:
+          "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+        delegate: "GPU"
+      },
+      runningMode: "VIDEO",
+      numFaces: 1
+    });
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: 640, height: 480, facingMode: "user" }
+    });
+    cam.srcObject = stream;
+    await cam.play();
+
+    running = true;
+    statusEl.textContent = "tracking — move your head";
+    statusEl.className = "status live";
+    document.getElementById("startBtn").textContent = "Camera on";
+    trackLoop();
+  } catch (err) {
+    statusEl.textContent = "camera/model error: " + (err.message || err);
+    statusEl.className = "status err";
+    console.error(err);
+  }
+}
+
+function trackLoop() {
+  if (!running) return;
+  if (cam.readyState >= 2) {
+    const res = faceLandmarker.detectForVideo(cam, performance.now());
+    if (res.faceLandmarks && res.faceLandmarks.length > 0) {
+      const lm = res.faceLandmarks[0];
+      // landmark 1 = nose tip. x,y are normalized 0..1 (x is mirrored).
+      const nose = lm[1];
+      targetX = 1 - nose.x;   // un-mirror so it matches your real movement
+      targetY = nose.y;
+      haveFace = true;
+    }
+  }
+  requestAnimationFrame(trackLoop);
+}
+
+// ---- 5. CONTROLS ---------------------------------------------------
+document.getElementById("startBtn").addEventListener("click", () => {
+  if (!running) startCamera();
+});
+
+const camWrap = document.getElementById("camWrap");
+document.getElementById("camToggle").addEventListener("click", (e) => {
+  camWrap.classList.toggle("hidden");
+  e.target.textContent = camWrap.classList.contains("hidden") ? "Show webcam" : "Hide webcam";
+});
+
+document.getElementById("strengthBtn").addEventListener("click", (e) => {
+  const order = ["Low", "Medium", "High"];
+  strengthName = order[(order.indexOf(strengthName) + 1) % order.length];
+  e.target.textContent = "Effect: " + strengthName;
+});
+
+// ---- 6. MOUSE FALLBACK (so you can test before granting camera) ----
+window.addEventListener("mousemove", (e) => {
+  if (haveFace) return;   // camera wins once a face is found
+  targetX = e.clientX / window.innerWidth;
+  targetY = e.clientY / window.innerHeight;
+});
+</script>
+</body>
+</html>
