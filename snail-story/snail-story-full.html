@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>A Snail's Tale — Home, Displacement &amp; Arrival</title>
+<style>
+  /* ============================================================
+     PALETTE
+     WARM vars  -> HOME + the open daylight sky of the CARRY/fall.
+     COOL vars  -> the foreign forest-floor ARRIVAL.
+     All kept together; both are needed in one continuous film.
+     ============================================================ */
+  :root{
+    /* ---- WARM: home + daylight ---- */
+    --sky-top:#BFE0E6;   /* soft open blue up high (so the bird reads against sky) */
+    --sky-bot:#F6D2AE;   /* warming to peach down at the clearing */
+    --sun:#FCEFD0;
+
+    --foliage-far:#CBD8A2;
+    --foliage-mid:#A9C381;
+    --foliage-near:#8FB36A;
+
+    --ground-top:#ECCFA4;
+    --ground-bot:#E0B888;
+
+    --rock-base:#C9A98B;
+    --rock-shade:#B8967A;
+    --rock-light:#D8BDA0;
+    --moss-a:#94B36A;
+    --moss-b:#A9C77F;
+
+    --ink:#5A4632;        /* warm "almost-black" — never pure #000 */
+    --cream:#FBEAC9;
+
+    /* flight: open-air sky, clouds, distant canopy, bird, talons */
+    --air-top:#CFE2EA;
+    --air-bot:#F4E6CF;
+    --cloud:#FDFBF6;
+    --tree:#5E7E63;
+    --tree-dk:#4C6852;
+    --bird:#8C8079;
+    --talon:#A2938A;
+    --talon-dk:#6F635C;
+
+    /* ---- COOL: foreign damp forest floor ---- */
+    --cool-sky-top:#21403E;
+    --cool-sky-bot:#3A564E;
+    --shaft:#EAF6E6;
+    --cool-ground-top:#3C4C42;
+    --cool-ground-bot:#293530;
+    --log-base:#4C4137;
+    --log-shade:#3A322B;
+    --log-light:#6A5C4C;
+    --lichen-a:#5E8C78;
+    --lichen-b:#82AE96;
+    --fern-far:#557A66;
+    --fern-mid:#6E9A7E;
+    --fern-near:#8AB99A;
+    --glow-stem:#D2E8DC;
+    --cool-ink:#24302A;
+    --cool-cream:#DCEAE0;
+  }
+
+  html,body{height:100%;margin:0;}
+  body{
+    background:#15110D;   /* deep frame around the square scene */
+    overflow:hidden;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* Square stage, centered, showing the central crop of the 1200x800 layout. */
+  #stage{
+    position:fixed;
+    top:50%;left:50%;transform:translate(-50%,-50%);
+    width:min(100vw,100vh);
+    height:min(100vw,100vh);
+    overflow:hidden;
+    border-radius:6px;
+    box-shadow:0 24px 80px rgba(0,0,0,.45);
+  }
+  #scene{width:100%;height:100%;display:block;}
+
+  /* Warm vignette + glow (home/daylight). PART-cool retints below. */
+  #vignette{
+    position:absolute;inset:0;pointer-events:none;
+    background:
+      radial-gradient(120% 90% at 32% 26%, rgba(255,247,228,.28), rgba(255,247,228,0) 45%),
+      radial-gradient(130% 120% at 50% 58%, rgba(0,0,0,0) 55%, rgba(90,70,50,.16) 100%);
+    mix-blend-mode:multiply;opacity:.9;
+    transition:background .8s ease;
+  }
+  #glow{
+    position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(60% 45% at 34% 24%, rgba(255,246,222,.35), rgba(255,246,222,0) 60%);
+    transition:background .8s ease;
+  }
+  /* arrival retints the same overlays cool — canopy light above, cool pool below */
+  #stage.cool #glow{
+    background:radial-gradient(55% 42% at 50% 6%, rgba(222,246,234,.32), rgba(222,246,234,0) 62%);
+  }
+  #stage.cool #vignette{
+    background:
+      radial-gradient(120% 80% at 50% 10%, rgba(214,242,230,.16), rgba(214,242,230,0) 45%),
+      radial-gradient(130% 120% at 50% 60%, rgba(0,0,0,0) 42%, rgba(10,24,20,.46) 100%);
+  }
+
+  /* The fade overlay. Color is set per-transition in JS:
+       bright (sky) for the lift-into-sky, black for the world change. */
+  #fadeblack{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;}
+
+  /* Beat caption ("home" / "elsewhere"), same gentle treatment throughout. */
+  #caption{
+    position:absolute;left:0;right:0;bottom:7%;text-align:center;
+    color:var(--ink);opacity:0;pointer-events:none;
+    font-size:clamp(15px,2.4vw,26px);letter-spacing:.55em;
+    text-transform:lowercase;font-weight:500;
+    text-indent:.55em;
+    transition:opacity .8s ease, color .8s ease;
+  }
+  #stage.cool #caption{color:var(--cool-cream);}
+
+  /* Replay — quiet, brightens on hover. Restarts the whole film. */
+  #replay{
+    position:fixed;right:18px;bottom:16px;
+    display:flex;align-items:center;gap:8px;
+    background:rgba(240,232,220,.5);color:#2a2018;
+    border:1px solid rgba(255,255,255,.18);
+    padding:9px 14px;border-radius:999px;
+    font-size:13px;letter-spacing:.06em;cursor:pointer;
+    opacity:.4;transition:opacity .3s ease, transform .2s ease, background .3s ease;
+    backdrop-filter:blur(3px);
+  }
+  #replay:hover{opacity:1;background:rgba(248,242,234,.85);}
+  #replay:active{transform:scale(.96);}
+  #replay svg{width:14px;height:14px;}
+
+  /* ============================================================
+     KEYFRAMES (same set as Beat 1; CSS = intro reveals + idle life,
+     JS rAF = the cinematic timeline + the path crawl).
+     ============================================================ */
+  @keyframes popIn{
+    from{opacity:0;transform:translateY(16px) scale(.92);}
+    to  {opacity:1;transform:translateY(0)    scale(1);}
+  }
+  @keyframes settleIn{
+    from{opacity:0;transform:scale(1.05);}
+    to  {opacity:1;transform:scale(1);}
+  }
+  @keyframes leafIn{
+    0%  {opacity:0;transform:translate(230px,-180px) rotate(34deg);}
+    55% {opacity:1;}
+    100%{opacity:1;transform:translate(0,0) rotate(0deg);}
+  }
+  @keyframes fadeUp{ from{opacity:0;} to{opacity:1;} }
+  @keyframes breathe{ 0%,100%{transform:scale(1,1);} 50%{transform:scale(1.035,.965);} }
+  @keyframes bob{ 0%,100%{transform:translateY(0);} 50%{transform:translateY(-3px);} }
+  @keyframes sway{ 0%,100%{transform:rotate(-1.4deg);} 50%{transform:rotate(1.4deg);} }
+  @keyframes flap{ 0%,100%{transform:scaleY(1);} 50%{transform:scaleY(.6);} }
+  /* leaves/particles thrown from the canopy as the hero falls in */
+  @keyframes burst{
+    from{transform:translate(0,0) rotate(0);opacity:1;}
+    to  {transform:translate(var(--bx),var(--by)) rotate(var(--br));opacity:0;}
+  }
+  @keyframes floatMote{
+    0%{transform:translate(0,0);opacity:0;} 15%{opacity:.7;}
+    85%{opacity:.5;} 100%{transform:translate(var(--dx),var(--dy));opacity:0;}
+  }
+  @media (prefers-reduced-motion: reduce){ .idle{animation:none !important;} }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <svg id="scene" viewBox="200 0 800 800" preserveAspectRatio="xMidYMid slice"
+         xmlns="http://www.w3.org/2000/svg" role="img"
+         aria-label="A snail at home; a bird passes, then talons lift it into the sky; it falls and arrives in a strange cool forest of slugs."></svg>
+    <div id="glow"></div>
+    <div id="vignette"></div>
+    <div id="fadeblack"></div>
+    <div id="caption">home</div>
+  </div>
+
+  <button id="replay" title="Replay">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+         stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/>
+    </svg>
+    replay
+  </button>
+
+<script>
+/* ==================================================================
+   A SNAIL'S TALE — the full opening film, one continuous timeline:
+
+     HOME      Beat-1 opening: the hero crawls a leaf on his mossy rock.
+               A bird crosses the distant sky (right -> left) and is gone.
+               Talons descend into the scene, close on the hero, and
+               lift him up and out of the top of frame.
+     CARRY     A bright lift carries us into open sky: the hero is held
+               aloft, then released — he stays centered and tumbles while
+               the WORLD rushes upward; the forest canopy rises to meet
+               him; fade to black.
+     ARRIVAL   Enters exactly like HOME opened (same intro + crawl), but
+               the world is a cool, foreign forest floor of slugs.
+
+   Single file, no frameworks. SAME architecture as Beat 1:
+   ASSETS registry -> per-layer <g> -> four nested transforms
+   (pos -> intro -> idle -> art) -> renderArtBody() draws a placeholder
+   when src is null and a swappable <image> when src is a path. rAF
+   drives motion; the DRAW table holds every placeholder shape.
+   ------------------------------------------------------------------
+
+   THREE registries, one per movement: ASSETS_HOME, ASSETS_CARRY,
+   ASSETS_B (arrival). Each is built fresh on entering its phase, so the
+   Beat-1-style intro animations fire on cue. Fields are identical to
+   Beat 1: id, type, layer, x, y, w, h, anchor{ax,ay}, rot, src, opts,
+   intro, delay, idle, idleDur, idleDelay, path (protagonist only).
+
+   ★★★  SWAPPING A PLACEHOLDER FOR A PNG (unchanged from Beat 1)  ★★★
+   Set  src: "assets/whatever.png"  on any entry. null -> DRAW[type](),
+   a string -> <image> at the same x/y/w/h/anchor (transparent PNGs).
+   The hero points at HERO_SRC in ALL THREE phases, so it stays visually
+   identical everywhere. Swappable types: sky, sun, foliage, ground,
+   rock, leaf, mushroom, grass, snail, ladybug, beetle, frog, bird,
+   talons, airsky, cloud, treetop, coolSky, lightShafts, coolGround,
+   log, fern, frond, glowMushroom, slug, foreignLeaf.
+   Tip: match w:h to the PNG's aspect (images use xMidYMid meet).
+   ================================================================== */
+
+const SVGNS = "http://www.w3.org/2000/svg";
+const ART = 100;                       // placeholders drawn in a 100x100 box centered on (0,0)
+const HERO_SRC = "assets/snail.png";   // shared so the hero is identical across all phases
+const CAPTION_B = "";                   // captions removed (was "elsewhere")
+
+/* color sets */
+const SHELL = {
+  amber: { body:"#EC9A78", foot:"#D97E5E", a:"#E2952F", b:"#BF6E1E", c:"#F6CE74", spiral:"#A85A18", banded:true },
+  coral: { body:"#E98F7C", foot:"#D2705F", a:"#E0705E", b:"#BF4E3D", c:"#F4A896" },
+  gold:  { body:"#E7B473", foot:"#D29A55", a:"#E4AE3F", b:"#C58A22", c:"#F7DC92" },
+  sage:  { body:"#AABF85", foot:"#8FA86A", a:"#93A86A", b:"#728A4E", c:"#C3D49C" },
+  rose:  { body:"#DDA0A6", foot:"#C8848C", a:"#D98C9A", b:"#B96A78", c:"#F0C2C8" },
+};
+const SLUG = {
+  jade:   { body:"#9FD0BC", foot:"#84B7A2", ridge:"#6FA08C", eye:"#34463E" },
+  violet: { body:"#BCB2D2", foot:"#A89EC2", ridge:"#9286AE", eye:"#3A3548" },
+  pale:   { body:"#C2E2D4", foot:"#A6CFBE", ridge:"#8FB9A8", eye:"#34463E" },
+};
+
+/* The hero's resting spot at the END of the home crawl (= the home
+   path's endpoint). The talons descend here to grab him. Keep these in
+   sync with the protagonist `path` below. */
+const HERO_REST = [700, 408];
+
+/* =======================  HOME  (Beat 1 + bird + talons)  ======== */
+const ASSETS_HOME = [
+  { id:"sky", type:"sky", layer:0, x:600, y:400, w:1500, h:1100, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:0 },
+  { id:"sun", type:"sun", layer:0, x:360, y:210, w:760, h:760, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:120 },
+
+  /* the distant bird (flies right->left during its window; rAF-driven) */
+  { id:"bird", type:"bird", layer:3, x:1320, y:155, w:110, h:74, anchor:{ax:.5,ay:.5},
+    src:null, intro:"none", idle:"flap", idleDur:.45, idleDelay:0 },
+
+  /* far/mid foliage lowered into a tree-line behind the clearing, leaving an
+     open sky band up top (~y 0..270) for the bird to cross. */
+  { id:"foliage-far-l", type:"foliage", layer:1, x:250, y:480, w:640, h:380, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:160, idle:"sway", idleDur:11, idleDelay:0, opts:{tone:"far"} },
+  { id:"foliage-far-r", type:"foliage", layer:1, x:980, y:460, w:680, h:400, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:220, idle:"sway", idleDur:13, idleDelay:2, opts:{tone:"far"} },
+  { id:"foliage-mid-l", type:"foliage", layer:2, x:150, y:560, w:560, h:380, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:240, idle:"sway", idleDur:9, idleDelay:1, opts:{tone:"mid"} },
+  { id:"foliage-mid-r", type:"foliage", layer:2, x:1060, y:575, w:580, h:380, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:300, idle:"sway", idleDur:10, idleDelay:3, opts:{tone:"mid"} },
+
+  { id:"ground", type:"ground", layer:3, x:600, y:660, w:1500, h:520, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:120 },
+  { id:"rock", type:"rock", layer:4, x:600, y:600, w:820, h:420, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:260 },
+
+  { id:"mushroom-1", type:"mushroom", layer:5, x:352, y:512, w:120, h:130, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1500, idle:"breathe", idleDur:6, idleDelay:.4, opts:{cap:"#E27A5E"} },
+  { id:"mushroom-2", type:"mushroom", layer:5, x:430, y:548, w:84, h:92, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1680, idle:"breathe", idleDur:5.4, idleDelay:1.1, opts:{cap:"#E8A24A"} },
+  { id:"mushroom-3", type:"mushroom", layer:5, x:858, y:540, w:100, h:108, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1820, idle:"breathe", idleDur:6.2, idleDelay:.7, opts:{cap:"#D98C9A"} },
+  { id:"grass-1", type:"grass", layer:5, x:300, y:560, w:150, h:120, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1400, idle:"sway", idleDur:7, idleDelay:0 },
+  { id:"grass-2", type:"grass", layer:5, x:910, y:580, w:160, h:130, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1560, idle:"sway", idleDur:8, idleDelay:1.5 },
+
+  { id:"snail-coral", type:"snail", layer:6, x:430, y:506, w:128, h:112, anchor:{ax:.5,ay:.86}, src:null, intro:"pop", delay:2000, idle:"breathe", idleDur:5, idleDelay:.3, opts:SHELL.coral },
+  { id:"snail-gold", type:"snail", layer:6, x:792, y:530, w:118, h:104, anchor:{ax:.5,ay:.86}, src:null, intro:"pop", delay:2200, idle:"breathe", idleDur:5.6, idleDelay:1.2, opts:{...SHELL.gold, flip:true} },
+  { id:"snail-sage", type:"snail", layer:6, x:548, y:486, w:92, h:82, anchor:{ax:.5,ay:.86}, src:null, intro:"pop", delay:2380, idle:"breathe", idleDur:6, idleDelay:.8, opts:SHELL.sage },
+  { id:"snail-rose", type:"snail", layer:6, x:706, y:478, w:80, h:72, anchor:{ax:.5,ay:.86}, src:null, intro:"pop", delay:2520, idle:"breathe", idleDur:5.2, idleDelay:1.9, opts:{...SHELL.rose, flip:true} },
+  { id:"ladybug", type:"ladybug", layer:6, x:512, y:548, w:64, h:60, anchor:{ax:.5,ay:.7}, src:null, intro:"pop", delay:2100, idle:"bob", idleDur:3.4, idleDelay:.5 },
+  { id:"beetle", type:"beetle", layer:6, x:636, y:560, w:78, h:72, anchor:{ax:.5,ay:.7}, src:null, intro:"pop", delay:2260, idle:"bob", idleDur:3.8, idleDelay:1.4 },
+  { id:"frog", type:"frog", layer:6, x:830, y:512, w:104, h:96, anchor:{ax:.5,ay:.82}, src:null, intro:"pop", delay:2440, idle:"breathe", idleDur:4.4, idleDelay:.2 },
+
+  { id:"leaf", type:"leaf", layer:7, x:648, y:430, w:440, h:210, anchor:{ax:.5,ay:.5}, src:"assets/leaf.png", intro:"leaf", delay:3000, idle:"sway", idleDur:7.5, idleDelay:.2 },
+
+  /* THE HERO — crawls the leaf (id "protagonist" so the crawl finds it),
+     then is grabbed. Path ENDS at HERO_REST. */
+  { id:"protagonist", type:"snail", layer:8, x:0, y:0, w:158, h:140, anchor:{ax:.5,ay:.82},
+    src:HERO_SRC, intro:"fade", delay:4700, idle:"breathe", idleDur:2.6, idleDelay:0,
+    opts:{...SHELL.amber, hero:true},
+    path:"M 500 452 C 560 436, 640 420, 700 408" },
+
+  /* the talons — parked above the frame until the snatch; rAF-driven.
+     The long leg in DRAW.talons runs off the top so it reads as the
+     foot of an (unseen) bird overhead, not a floating stub. */
+  /* enters OPEN (opts.open), then closes on the hero at GRAB_AT */
+  { id:"talons", type:"talons", layer:9, x:700, y:-300, w:200, h:200, anchor:{ax:.5,ay:.5}, src:null, intro:"none", opts:{open:true} },
+];
+
+/* =======================  CARRY  (held aloft -> the fall)  ======= */
+const ASSETS_CARRY = [
+  { id:"airsky", type:"airsky", layer:0, x:600, y:400, w:1500, h:1100, anchor:{ax:.5,ay:.5}, src:null, intro:"none" },
+
+  { id:"cloud-0", type:"cloud", layer:1, x:300, y:180, w:360, h:180, anchor:{ax:.5,ay:.5}, src:null, intro:"none", opts:{sp:0.7, depth:0.8} },
+  { id:"cloud-1", type:"cloud", layer:1, x:830, y:120, w:430, h:200, anchor:{ax:.5,ay:.5}, src:null, intro:"none", opts:{sp:0.9, depth:0.7} },
+  { id:"cloud-2", type:"cloud", layer:1, x:600, y:320, w:320, h:150, anchor:{ax:.5,ay:.5}, src:null, intro:"none", opts:{sp:1.1, depth:1.0} },
+  { id:"cloud-3", type:"cloud", layer:2, x:180, y:430, w:300, h:150, anchor:{ax:.5,ay:.5}, src:null, intro:"none", opts:{sp:1.3, depth:1.2} },
+  { id:"cloud-4", type:"cloud", layer:2, x:920, y:470, w:360, h:170, anchor:{ax:.5,ay:.5}, src:null, intro:"none", opts:{sp:1.5, depth:1.3} },
+  { id:"cloud-5", type:"cloud", layer:2, x:520, y:580, w:280, h:140, anchor:{ax:.5,ay:.5}, src:null, intro:"none", opts:{sp:1.0, depth:1.1} },
+
+  { id:"tree-0", type:"treetop", layer:7, x:80,   y:1180, w:460, h:380, anchor:{ax:.5,ay:.5}, src:null, intro:"none", opts:{restY:640} },
+  { id:"tree-1", type:"treetop", layer:7, x:340,  y:1180, w:540, h:440, anchor:{ax:.5,ay:.5}, src:null, intro:"none", opts:{restY:600} },
+  { id:"tree-2", type:"treetop", layer:7, x:660,  y:1180, w:560, h:460, anchor:{ax:.5,ay:.5}, src:null, intro:"none", opts:{restY:580} },
+  { id:"tree-3", type:"treetop", layer:7, x:960,  y:1180, w:520, h:420, anchor:{ax:.5,ay:.5}, src:null, intro:"none", opts:{restY:610} },
+  { id:"tree-4", type:"treetop", layer:7, x:1180, y:1180, w:480, h:400, anchor:{ax:.5,ay:.5}, src:null, intro:"none", opts:{restY:640} },
+
+  { id:"hero-carry", type:"snail", layer:6, x:600, y:360, w:160, h:142, anchor:{ax:.5,ay:.5},
+    src:HERO_SRC, intro:"none", idle:"breathe", idleDur:2.8, idleDelay:0, opts:{...SHELL.amber, hero:true} },
+
+  { id:"talons", type:"talons", layer:9, x:600, y:-300, w:200, h:200, anchor:{ax:.5,ay:.5}, src:null, intro:"none" },
+];
+
+/* =======================  ARRIVAL  (foreign, slugs only)  ======= */
+const ASSETS_B = [
+  { id:"coolsky", type:"coolSky", layer:0, x:600, y:400, w:1500, h:1100, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:0 },
+
+  { id:"frond-far-l", type:"frond", layer:1, x:200, y:250, w:540, h:600, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:200, idle:"sway", idleDur:12, idleDelay:0, opts:{tone:"far"} },
+  { id:"frond-far-r", type:"frond", layer:1, x:1010, y:220, w:560, h:620, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:260, idle:"sway", idleDur:14, idleDelay:2, opts:{tone:"far", flip:true} },
+  { id:"shafts", type:"lightShafts", layer:1, x:560, y:280, w:1100, h:1000, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:120 },
+
+  { id:"coolground", type:"coolGround", layer:2, x:600, y:680, w:1500, h:520, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:120 },
+  { id:"log", type:"log", layer:3, x:600, y:612, w:900, h:230, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:260 },
+
+  { id:"glowmush-1", type:"glowMushroom", layer:4, x:300, y:560, w:124, h:144, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1400, idle:"breathe", idleDur:5, idleDelay:.4, opts:{cap:"jade"} },
+  { id:"glowmush-2", type:"glowMushroom", layer:4, x:520, y:560, w:92, h:106, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1600, idle:"breathe", idleDur:5.6, idleDelay:1.1, opts:{cap:"violet"} },
+  { id:"glowmush-3", type:"glowMushroom", layer:4, x:812, y:556, w:108, h:124, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1760, idle:"breathe", idleDur:6, idleDelay:.7, opts:{cap:"jade"} },
+  { id:"fern-1", type:"fern", layer:4, x:360, y:566, w:150, h:185, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1500, idle:"sway", idleDur:7, idleDelay:0, opts:{tone:"near"} },
+  { id:"fern-2", type:"fern", layer:4, x:470, y:588, w:110, h:140, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1680, idle:"sway", idleDur:6.4, idleDelay:1.1, opts:{tone:"mid"} },
+  { id:"fern-3", type:"fern", layer:4, x:884, y:572, w:140, h:172, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1820, idle:"sway", idleDur:7.5, idleDelay:.6, opts:{tone:"near", flip:true} },
+
+  { id:"slug-jade", type:"slug", layer:5, x:440, y:548, w:140, h:96, anchor:{ax:.5,ay:.86}, src:null, intro:"pop", delay:2000, idle:"breathe", idleDur:5.2, idleDelay:.3, opts:SLUG.jade },
+  { id:"slug-violet", type:"slug", layer:5, x:786, y:560, w:130, h:90, anchor:{ax:.5,ay:.86}, src:null, intro:"pop", delay:2200, idle:"sway", idleDur:6, idleDelay:1.2, opts:{...SLUG.violet, flip:true} },
+  { id:"slug-pale", type:"slug", layer:5, x:602, y:540, w:110, h:78, anchor:{ax:.5,ay:.86}, src:null, intro:"pop", delay:2380, idle:"breathe", idleDur:5.8, idleDelay:.8, opts:SLUG.pale },
+  { id:"slug-jade-2", type:"slug", layer:5, x:694, y:520, w:92, h:66, anchor:{ax:.5,ay:.86}, src:null, intro:"pop", delay:2520, idle:"sway", idleDur:6.4, idleDelay:1.9, opts:{...SLUG.jade, flip:true} },
+
+  { id:"leaf", type:"foreignLeaf", layer:6, x:648, y:444, w:430, h:210, anchor:{ax:.5,ay:.5}, src:null, intro:"leaf", delay:3000, idle:"sway", idleDur:7.5, idleDelay:.2 },
+
+  { id:"protagonist", type:"snail", layer:7, x:0, y:0, w:158, h:140, anchor:{ax:.5,ay:.82},
+    src:HERO_SRC, intro:"fade", delay:4700, idle:"breathe", idleDur:2.6, idleDelay:0, opts:{...SHELL.amber, hero:true},
+    path:"M 500 470 C 585 450, 665 434, 735 420 C 786 410, 820 407, 848 408" },
+
+  { id:"frond-fg-l", type:"fern", layer:8, x:210, y:700, w:300, h:340, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1300, idle:"sway", idleDur:9, idleDelay:.5, opts:{tone:"far"} },
+  { id:"frond-fg-r", type:"fern", layer:8, x:1000, y:710, w:320, h:360, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1450, idle:"sway", idleDur:10, idleDelay:1.6, opts:{tone:"far", flip:true} },
+];
+
+/* ================================================================
+   TIMELINE  — all times are LOCAL to each phase (ms from when that
+   phase was built). One block to retune the whole film's rhythm.
+   ================================================================ */
+const INTRO_FADE = 600;     // film opens from black
+
+/* shared crawl feel (HOME + ARRIVAL) — same as Beat 1 */
+const CRAWL_START   = 4900;
+const CRAWL_DUR     = 4300;
+const CAPTION_AT    = 7600;
+
+/* HOME phase */
+const BIRD_AT       = 10300; // distant bird enters from the right
+const BIRD_DUR      = 2600;  // ...and crosses to the left, then is gone
+const SNATCH_AT     = 13200; // talons begin descending
+const GRAB_AT       = 14500; // talons close on the resting hero
+const LIFT_END      = 15500; // hero lifted up and out of the top
+const HOME_OUT_AT   = 15250; // bright lift-into-sky fade begins
+const SHORT_FADE    = 900;   // the bright transition length
+const HOME_END      = HOME_OUT_AT + SHORT_FADE; // -> enter CARRY (~16150)
+
+/* CARRY phase */
+const CARRY_FALL    = 1700;  // talons open + retract; the fall begins
+const CARRY_TREES   = 4200;  // canopy rises from the bottom
+const CARRY_FADEOUT = 6400;  // fade to black
+const FADE_DUR      = 1300;  // black fade length
+const BLACK_HOLD    = 700;   // beat held on full black between worlds
+const CARRY_END     = CARRY_FADEOUT + FADE_DUR + BLACK_HOLD; // -> enter ARRIVAL (~8400)
+
+/* geometry */
+const CLAW_OFFSET = 92;   // claws sit this far below the talons' center (for h=200)
+const HELD = [600, 360];  // where the hero is held aloft
+const FALLC= [600, 480];  // where the falling hero hovers, centered
+
+const PARALLAX_MAX = 14;
+const DARK  = "#000000";
+const LIGHT = "#FCEFD6";  // the bright "up into the sky" transition tone
+
+/* ================================================================
+   RENDERING (identical to Beat 1)
+   ================================================================ */
+const scene    = document.getElementById("scene");
+const stage    = document.getElementById("stage");
+const fadeEl   = document.getElementById("fadeblack");
+const captionEl= document.getElementById("caption");
+
+let layerGroups = {};
+let nodeById    = {};
+let hero        = null;   // protagonist's pos-group + sampled path (HOME & ARRIVAL)
+let rafId       = null;
+let phase       = "HOME";
+let phaseStart  = 0;
+let talonsOpened= false;   // CARRY: talons spring open at release
+let talonsClosed= false;   // HOME:  talons close on the hero at GRAB_AT
+let burstDone   = false;   // CARRY: canopy leaf-burst fired once
+
+function el(tag, attrs){
+  const n = document.createElementNS(SVGNS, tag);
+  if(attrs) for(const k in attrs) n.setAttribute(k, attrs[k]);
+  return n;
+}
+
+function renderAsset(a){
+  const pos = el("g", { class:"pos", transform:`translate(${a.x},${a.y}) rotate(${a.rot||0})` });
+  pos.dataset.id = a.id;
+  const intro = el("g", { class:"intro" });
+  applyIntro(intro, a);
+  const idle = el("g", { class:"idle" });
+  if(a.idle){
+    idle.style.animation = `${a.idle} ${a.idleDur||5}s ease-in-out infinite`;
+    idle.style.animationDelay = `${a.idleDelay||0}s`;
+  }
+  const sx = a.w/ART, sy = a.h/ART;
+  const ax = a.anchor?.ax ?? .5, ay = a.anchor?.ay ?? .5;
+  const offX = (.5-ax)*a.w, offY = (.5-ay)*a.h;
+  const art = el("g", { class:"art", transform:`translate(${offX},${offY}) scale(${sx},${sy})` });
+  art.innerHTML = renderArtBody(a);
+  idle.appendChild(art); intro.appendChild(idle); pos.appendChild(intro);
+  return pos;
+}
+
+function renderArtBody(a){
+  if(a.src){
+    return `<image href="${a.src}" x="-50" y="-50" width="100" height="100" preserveAspectRatio="xMidYMid meet"/>`;
+  }
+  const draw = DRAW[a.type];
+  return draw ? draw(a.opts||{}) : `<rect x="-50" y="-50" width="100" height="100" fill="#ccc"/>`;
+}
+
+function applyIntro(node, a){
+  const d = `${a.delay||0}ms`;
+  switch(a.intro){
+    case "settle": node.style.animation = `settleIn 1.4s cubic-bezier(.22,.61,.36,1) both`; break;
+    case "leaf":   node.style.animation = `leafIn 1.8s cubic-bezier(.22,.7,.3,1) both`; break;
+    case "fade":   node.style.animation = `fadeUp 1.1s ease both`; break;
+    case "none":   node.style.opacity = 1; return;
+    case "pop":
+    default:       node.style.animation = `popIn .95s cubic-bezier(.22,1.1,.36,1) both`; break;
+  }
+  node.style.animationDelay = d;
+}
+
+function buildScene(assets, {motes=false, moteColors=["#FFFFFF"]}={}){
+  scene.innerHTML = "";
+  layerGroups = {}; nodeById = {}; hero = null;
+  scene.appendChild(buildDefs());
+  const layers = [...new Set(assets.map(a=>a.layer))].sort((p,q)=>p-q);
+  for(const L of layers){
+    const g = el("g", { class:"layer", "data-layer":L });
+    layerGroups[L] = g; scene.appendChild(g);
+  }
+  for(const a of assets){
+    const node = renderAsset(a);
+    layerGroups[a.layer].appendChild(node);
+    nodeById[a.id] = node;
+    if(a.id === "protagonist") hero = { pos:node, asset:a, path:samplePath(a.path) };
+  }
+  if(motes) spawnMotes(moteColors);
+}
+
+function buildDefs(){
+  const defs = el("defs");
+  defs.innerHTML = `
+    <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="var(--sky-top)"/><stop offset="1" stop-color="var(--sky-bot)"/>
+    </linearGradient>
+    <radialGradient id="sunGrad" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="var(--sun)" stop-opacity="0.95"/>
+      <stop offset="0.5" stop-color="var(--sun)" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="var(--sun)" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="groundGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="var(--ground-top)"/><stop offset="1" stop-color="var(--ground-bot)"/>
+    </linearGradient>
+    <linearGradient id="rockGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="var(--rock-light)"/><stop offset="1" stop-color="var(--rock-base)"/>
+    </linearGradient>
+    <linearGradient id="airGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="var(--air-top)"/><stop offset="1" stop-color="var(--air-bot)"/>
+    </linearGradient>
+    <linearGradient id="coolSkyGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="var(--cool-sky-top)"/><stop offset="1" stop-color="var(--cool-sky-bot)"/>
+    </linearGradient>
+    <linearGradient id="coolGroundGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="var(--cool-ground-top)"/><stop offset="1" stop-color="var(--cool-ground-bot)"/>
+    </linearGradient>
+    <linearGradient id="logGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="var(--log-light)"/><stop offset="1" stop-color="var(--log-base)"/>
+    </linearGradient>
+    <radialGradient id="glowGrad" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#EAFBF1" stop-opacity="0.85"/>
+      <stop offset="0.5" stop-color="#BFEAD6" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#BFEAD6" stop-opacity="0"/>
+    </radialGradient>`;
+  return defs;
+}
+
+function spawnMotes(colors){
+  const top = Math.max(...Object.keys(layerGroups).map(Number));
+  const g = el("g", { class:"motes" });
+  layerGroups[top].appendChild(g);
+  for(let i=0;i<16;i++){
+    const x = 120 + Math.random()*960, y = 200 + Math.random()*420, r = 1.6 + Math.random()*2.8;
+    const c = el("circle", { cx:x, cy:y, r, fill: colors[Math.floor(Math.random()*colors.length)] });
+    c.style.setProperty("--dx", `${(Math.random()-.5)*60}px`);
+    c.style.setProperty("--dy", `${-90 - Math.random()*120}px`);
+    c.style.animation = `floatMote ${7+Math.random()*6}s linear infinite`;
+    c.style.animationDelay = `${Math.random()*8}s`;
+    c.style.opacity = 0;
+    g.appendChild(c);
+  }
+}
+
+/* ---- math / helpers ---- */
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp  = (a,b,t)=>a+(b-a)*t;
+const easeInOut = t => t<.5 ? 2*t*t : 1 - Math.pow(-2*t+2,2)/2;
+const easeOut   = t => 1 - Math.pow(1-t,3);
+const easeIn    = t => t*t*t;
+function wrap(v,min,max){ const r=max-min; return min + (((v-min)%r)+r)%r; }
+function setOpacity(node,o){ if(node) node.style.opacity = o; }
+function showCaption(){ captionEl.style.opacity = .85; }
+
+/* ---- path crawl (HOME + ARRIVAL) ---- */
+function samplePath(d){
+  const p = el("path", { d }); p.style.visibility = "hidden"; scene.appendChild(p);
+  return { node:p, len:p.getTotalLength() };
+}
+function placeHeroAt(progress){
+  const { path } = hero;
+  const dd  = clamp(progress*path.len, 0, path.len);
+  const pt  = path.node.getPointAtLength(dd);
+  const pt2 = path.node.getPointAtLength(Math.min(path.len, dd + 1.5));
+  let ang = Math.atan2(pt2.y-pt.y, pt2.x-pt.x) * 180/Math.PI;
+  ang = Math.max(-16, Math.min(16, ang));
+  hero.pos.setAttribute("transform", `translate(${pt.x},${pt.y}) rotate(${ang})`);
+}
+
+/* ---- clouds + trees (shared by CARRY) ---- */
+function updateClouds(assets, t, vScroll){
+  for(const c of assets){
+    if(c.type !== "cloud") continue;
+    const node = nodeById[c.id]; if(!node) continue;
+    const driftX = (t*0.018)*c.opts.sp;
+    const x = wrap(c.x - driftX, -320, 1520);
+    const y = wrap(c.y - vScroll*c.opts.depth, -320, 1120);
+    node.setAttribute("transform", `translate(${x},${y})`);
+  }
+}
+function updateTrees(assets, t, startAt, endAt){
+  const p = clamp((t-startAt)/(endAt-startAt+500), 0, 1);
+  const e = easeOut(p);
+  for(const tr of assets){
+    if(tr.type !== "treetop") continue;
+    const node = nodeById[tr.id]; if(!node) continue;
+    const y = lerp(1180, tr.opts.restY, e);
+    const s = lerp(0.7, 1.28, e);
+    node.setAttribute("transform", `translate(${tr.x},${y}) scale(${s})`);
+  }
+}
+/* re-draw the talons OPEN at the moment of release (uses the DRAW table) */
+function openTalons(){
+  const art = nodeById["talons"]?.querySelector(".art");
+  if(art) art.innerHTML = DRAW.talons({open:true});
+}
+/* re-draw the talons CLOSED as they grab the hero in HOME */
+function closeTalons(){
+  const art = nodeById["talons"]?.querySelector(".art");
+  if(art) art.innerHTML = DRAW.talons({});
+}
+
+/* a quick scatter of leaves/specks flung from the canopy as the hero drops in */
+function spawnLeafBurst(){
+  const top = Math.max(...Object.keys(layerGroups).map(Number));
+  const g = el("g");
+  layerGroups[top].appendChild(g);
+  const cols = ["#6E9A5E","#86B36A","#A9C77F","#9CC078","#E2952F"];
+  for(let i=0;i<22;i++){
+    const x = 320 + Math.random()*560;
+    const y = 560 + Math.random()*80;
+    const s = 0.6 + Math.random()*0.9;
+    const wrap = el("g", { transform:`translate(${x},${y})` });
+    const anim = el("g");
+    anim.style.setProperty("--bx", `${(Math.random()-.5)*260}px`);
+    anim.style.setProperty("--by", `${-130 - Math.random()*200}px`);
+    anim.style.setProperty("--br", `${(Math.random()-.5)*420}deg`);
+    anim.style.animation = `burst ${1.1+Math.random()*0.7}s cubic-bezier(.2,.6,.3,1) forwards`;
+    const leaf = el("path", { d:"M0 0 Q5 -7 0 -16 Q-5 -7 0 0 Z", fill:cols[i%cols.length],
+                              transform:`scale(${s}) rotate(${Math.random()*360})` });
+    anim.appendChild(leaf); wrap.appendChild(anim); g.appendChild(wrap);
+  }
+}
+
+/* ================================================================
+   PHASE ORCHESTRATION
+   ================================================================ */
+function orchestrateHOME(tl){
+  // fade: open from black, then bright lift-into-sky at the end
+  fadeEl.style.background = tl < INTRO_FADE ? DARK : LIGHT;
+  if(tl < INTRO_FADE)          fadeEl.style.opacity = 1 - tl/INTRO_FADE;
+  else if(tl >= HOME_OUT_AT)   fadeEl.style.opacity = clamp((tl-HOME_OUT_AT)/SHORT_FADE, 0, 1);
+  else                         fadeEl.style.opacity = 0;
+
+  if(tl >= CAPTION_AT) showCaption();
+
+  // the distant bird: enters right, crosses to the left, gone
+  const bird = nodeById["bird"];
+  if(bird){
+    if(tl < BIRD_AT || tl > BIRD_AT + BIRD_DUR){ setOpacity(bird, 0); }
+    else{
+      const p  = (tl - BIRD_AT)/BIRD_DUR;
+      const bx = lerp(1320, -140, p);
+      const by = 155 - Math.sin(p*Math.PI)*22 + Math.sin(p*7)*4; // gentle gliding arc
+      setOpacity(bird, 1);
+      bird.setAttribute("transform", `translate(${bx},${by})`);
+    }
+  }
+
+  const hpos = nodeById["protagonist"];
+  const talons = nodeById["talons"];
+
+  if(tl < SNATCH_AT){
+    // crawl, then rest at HERO_REST; talons wait above the frame
+    if(hero){
+      if(tl < CRAWL_START) placeHeroAt(0);
+      else placeHeroAt(easeInOut(Math.min((tl-CRAWL_START)/CRAWL_DUR, 1)));
+    }
+    talons?.setAttribute("transform", "translate(700,-300)");
+  } else if(tl < GRAB_AT){
+    // talons descend to the resting hero
+    if(hero) placeHeroAt(1);
+    const p = clamp((tl-SNATCH_AT)/(GRAB_AT-SNATCH_AT), 0, 1);
+    const ty = lerp(-200, HERO_REST[1]-CLAW_OFFSET, easeOut(p));
+    talons?.setAttribute("transform", `translate(${HERO_REST[0]},${ty})`);
+  } else {
+    // grab + lift the hero up and out the top; talons follow, claws on him
+    if(!talonsClosed){ closeTalons(); talonsClosed = true; }   // close on the snail
+    const e = easeInOut(clamp((tl-GRAB_AT)/(LIFT_END-GRAB_AT), 0, 1));
+    const hx = lerp(HERO_REST[0], 600, e);
+    const hy = lerp(HERO_REST[1], -170, e);
+    hpos  ?.setAttribute("transform", `translate(${hx},${hy}) rotate(${-6*e})`);
+    talons?.setAttribute("transform", `translate(${hx},${hy-CLAW_OFFSET})`);
+  }
+
+  if(tl >= HOME_END) enterPhase("CARRY");
+}
+
+function orchestrateCARRY(tl){
+  // fade: bright reveal in (matching HOME's lift), then to black for the world change
+  if(tl < SHORT_FADE){ fadeEl.style.background = LIGHT; fadeEl.style.opacity = 1 - tl/SHORT_FADE; }
+  else{
+    fadeEl.style.background = DARK;
+    if(tl >= CARRY_FADEOUT && tl < CARRY_FADEOUT+FADE_DUR) fadeEl.style.opacity = (tl-CARRY_FADEOUT)/FADE_DUR;
+    else if(tl >= CARRY_FADEOUT+FADE_DUR)                  fadeEl.style.opacity = 1;
+    else                                                  fadeEl.style.opacity = 0;
+  }
+
+  const hpos = nodeById["hero-carry"];
+  const talons = nodeById["talons"];
+
+  if(tl < CARRY_FALL){
+    // held aloft, weightless bob
+    const bob = Math.sin(tl/650)*6;
+    hpos  ?.setAttribute("transform", `translate(600,${HELD[1]+bob})`);
+    talons?.setAttribute("transform", `translate(600,${HELD[1]+bob-CLAW_OFFSET})`);
+    setOpacity(talons, 1);
+  } else {
+    // RELEASE: talons open + retract; hero stays centered & tumbles; world rushes UP
+    if(!talonsOpened){ openTalons(); talonsOpened = true; }
+    const pr = clamp((tl-CARRY_FALL)/700, 0, 1);
+    talons?.setAttribute("transform", `translate(600,${lerp(HELD[1]-CLAW_OFFSET, -600, easeIn(pr))})`);
+    setOpacity(talons, 1-pr);
+
+    const ps = clamp((tl-CARRY_FALL)/600, 0, 1);
+    let hy = lerp(HELD[1], FALLC[1], ps);   // weightless hover while the world rushes up
+    if(tl > CARRY_TREES){
+      // the canopy is rising — let the hero drop down behind it and out the bottom
+      const pdrop = clamp((tl-CARRY_TREES)/(CARRY_FADEOUT-CARRY_TREES), 0, 1);
+      hy = lerp(FALLC[1], 1120, easeIn(pdrop));
+      if(tl > CARRY_TREES+1150 && !burstDone){ spawnLeafBurst(); burstDone = true; }
+    }
+    const ft = (tl-CARRY_FALL)/1000;
+    const rot = Math.sin(ft*2.1)*10 + Math.sin(ft*0.7)*4;   // dreamy, not violent
+    hpos?.setAttribute("transform", `translate(${600+Math.sin(ft*1.3)*10},${hy}) rotate(${rot})`);
+  }
+
+  const vScroll = tl>CARRY_FALL ? Math.min(0.00045*(tl-CARRY_FALL)*(tl-CARRY_FALL), 9000) : 0;
+  updateClouds(ASSETS_CARRY, tl, vScroll);
+  updateTrees(ASSETS_CARRY, tl, CARRY_TREES, CARRY_FADEOUT);
+
+  if(tl >= CARRY_END) enterPhase("ARRIVAL");
+}
+
+function orchestrateARRIVAL(tl){
+  fadeEl.style.background = DARK;
+  fadeEl.style.opacity = tl < FADE_DUR ? 1 - tl/FADE_DUR : 0;
+
+  if(tl >= CAPTION_AT) showCaption();
+  if(hero){
+    if(tl < CRAWL_START) placeHeroAt(0);
+    else placeHeroAt(easeInOut(Math.min((tl-CRAWL_START)/CRAWL_DUR, 1)));
+  }
+}
+
+/* ================================================================
+   PHASE ENTRY + MAIN LOOP
+   ================================================================ */
+function enterPhase(name){
+  phase = name;
+  phaseStart = performance.now();
+  talonsOpened = false;
+  talonsClosed = false;
+  burstDone = false;
+  captionEl.style.transition = "none";
+  captionEl.style.opacity = 0;
+
+  if(name === "HOME"){
+    stage.classList.remove("cool");
+    captionEl.textContent = "";
+    buildScene(ASSETS_HOME, { motes:true, moteColors:["#FCEFD0","#FFFFFF"] });
+  } else if(name === "CARRY"){
+    stage.classList.remove("cool");
+    captionEl.textContent = "";
+    buildScene(ASSETS_CARRY, { motes:false });
+  } else { // ARRIVAL
+    stage.classList.add("cool");
+    captionEl.textContent = CAPTION_B;
+    buildScene(ASSETS_B, { motes:true, moteColors:["#CFEFE0","#FFFFFF","#BFE2D6"] });
+  }
+  void scene.getBoundingClientRect();          // reflow so CSS animations restart at 0
+  captionEl.style.transition = "opacity .8s ease, color .8s ease";
+}
+
+function tick(now){
+  const tl = now - phaseStart;
+  if(phase === "HOME")        orchestrateHOME(tl);
+  else if(phase === "CARRY")  orchestrateCARRY(tl);
+  else                        orchestrateARRIVAL(tl);
+  rafId = requestAnimationFrame(tick);
+}
+
+function play(){
+  if(rafId) cancelAnimationFrame(rafId);
+  enterPhase("HOME");
+  rafId = requestAnimationFrame(tick);
+}
+document.getElementById("replay").addEventListener("click", play);
+
+/* ---- parallax pointer hook (subtle; expand later for depth) ---- */
+window.addEventListener("pointermove", (e)=>{
+  const nx = (e.clientX/window.innerWidth  - .5)*2;
+  const ny = (e.clientY/window.innerHeight - .5)*2;
+  const keys = Object.keys(layerGroups).map(Number).sort((a,b)=>a-b);
+  keys.forEach((L,i)=>{
+    const depth = (1 - i/Math.max(1,(keys.length-1))) * PARALLAX_MAX;
+    const g = layerGroups[L];
+    g.style.transition = "transform .5s cubic-bezier(.2,.7,.3,1)";
+    g.style.transform  = `translate(${ -nx*depth }px, ${ -ny*depth }px)`;
+  });
+});
+
+/* ================================================================
+   ░░░  PLACEHOLDER ART  ░░░  (100x100 box centered on (0,0))
+   Flat fills, soft palettes, bold silhouettes — Florence.
+   Isolated from layout/animation; the only thing a PNG swap replaces.
+   ================================================================ */
+const DRAW = {
+
+  /* ---------- HOME (Beat 1) ---------- */
+  sky: () => `<rect x="-50" y="-50" width="100" height="100" fill="url(#skyGrad)"/>`,
+  sun: () => `<circle cx="0" cy="0" r="50" fill="url(#sunGrad)"/>`,
+
+  foliage: (o)=>{
+    const c = o.tone==="far" ? "var(--foliage-far)" : o.tone==="mid" ? "var(--foliage-mid)" : "var(--foliage-near)";
+    return `
+      <g fill="${c}">
+        <circle cx="-22" cy="-6" r="34"/><circle cx="10" cy="-20" r="30"/>
+        <circle cx="26" cy="6" r="26"/><circle cx="-2" cy="14" r="30"/><circle cx="-34" cy="16" r="22"/>
+      </g>
+      <g fill="rgba(255,255,255,.10)"><circle cx="6" cy="-22" r="14"/><circle cx="-26" cy="-6" r="11"/></g>`;
+  },
+
+  ground: ()=>`
+    <path d="M-50 4 Q-50 -22 -22 -28 Q0 -32 22 -28 Q50 -22 50 6 L50 50 L-50 50 Z" fill="url(#groundGrad)"/>
+    <ellipse cx="-6" cy="-18" rx="30" ry="6" fill="rgba(255,255,255,.10)"/>`,
+
+  rock: ()=>`
+    <path d="M-48 28 Q-52 -6 -28 -20 Q-6 -32 16 -28 Q44 -22 48 6 Q50 26 30 34 Q0 42 -28 38 Q-46 36 -48 28 Z" fill="url(#rockGrad)"/>
+    <path d="M-46 26 Q0 44 48 8 Q50 26 30 34 Q0 42 -28 38 Q-46 36 -46 26 Z" fill="var(--rock-shade)" opacity=".55"/>
+    <path d="M-44 4 Q-40 -16 -20 -22 Q0 -30 18 -24 Q40 -18 42 0 Q24 12 0 12 Q-24 12 -44 4 Z" fill="var(--moss-a)"/>
+    <path d="M-40 0 Q-22 -18 0 -16 Q22 -18 38 -2 Q20 6 0 6 Q-22 6 -40 0 Z" fill="var(--moss-b)" opacity=".9"/>
+    <g fill="var(--moss-b)"><circle cx="-30" cy="8" r="3.4"/><circle cx="22" cy="6" r="3"/><circle cx="-8" cy="12" r="2.6"/></g>
+    <ellipse cx="-34" cy="26" rx="9" ry="5.5" fill="var(--rock-light)"/>
+    <ellipse cx="34" cy="22" rx="7" ry="4.5" fill="var(--rock-light)"/>`,
+
+  leaf: ()=>`
+    <path d="M-46 6 Q-40 8 -28 4" stroke="#6E9248" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M-30 4 Q-6 -42 36 -20 Q52 -10 46 8 Q40 30 4 34 Q-26 36 -30 4 Z" fill="var(--foliage-near)"/>
+    <path d="M-22 4 Q-2 -28 30 -14 Q44 -6 38 8 Q30 24 2 26 Q-20 26 -22 4 Z" fill="#A6C77E" opacity=".75"/>
+    <path d="M-28 4 Q6 2 44 4" stroke="#6E9248" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <g stroke="#6E9248" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".8">
+      <path d="M-14 3 Q-8 -10 0 -14"/><path d="M2 3 Q8 -8 18 -10"/><path d="M18 4 Q24 -2 32 -2"/>
+      <path d="M-12 4 Q-8 14 -2 20"/><path d="M6 4 Q12 14 20 18"/>
+    </g>`,
+
+  mushroom: (o)=>{
+    const cap = o.cap || "#E27A5E";
+    return `
+      <path d="M-7 48 Q-10 8 0 5 Q10 8 7 48 Z" fill="var(--cream)"/>
+      <path d="M-9 47 Q-10 20 0 18 L0 48 Z" fill="rgba(90,70,50,.10)"/>
+      <path d="M-30 8 Q0 -32 30 8 Q0 24 -30 8 Z" fill="${cap}"/>
+      <g fill="rgba(255,255,255,.85)"><circle cx="-12" cy="-2" r="3.6"/><circle cx="8" cy="-6" r="3"/><circle cx="16" cy="4" r="2.6"/><circle cx="-2" cy="6" r="2.4"/></g>`;
+  },
+
+  grass: ()=>`
+    <g stroke="var(--foliage-near)" stroke-width="5" fill="none" stroke-linecap="round">
+      <path d="M-18 48 Q-22 14 -28 -6"/><path d="M-6 48 Q-6 10 -2 -20"/><path d="M6 48 Q10 16 18 -8"/><path d="M18 48 Q22 22 30 2"/>
+    </g>
+    <g stroke="var(--foliage-mid)" stroke-width="4" fill="none" stroke-linecap="round" opacity=".85">
+      <path d="M-12 48 Q-10 20 -14 0"/><path d="M2 48 Q6 18 12 -2"/>
+    </g>`,
+
+  /* SNAIL — the hero. Identical across all phases (matches the swapped PNG). */
+  snail: (o)=>{
+    const body = o.body || "#EC9A78", foot = o.foot || "#D97E5E";
+    const a = o.a || "#E2952F", b = o.b || "#BF6E1E", c = o.c || "#F6CE74";
+    const spiral = o.spiral || "#A85A18";
+    const flip = o.flip ? `transform="scale(-1,1)"` : "";
+    const spiralLine = o.banded
+      ? `<path d="M2 0 Q2 -7 -6 -7 Q-17 -7 -17 4 Q-17 19 0 19 Q22 19 22 -6" stroke="${spiral}" stroke-width="2.4" fill="none" stroke-linecap="round" opacity=".85"/>` : "";
+    return `
+    <g ${flip}>
+      <path d="M-46 36 Q-50 26 -38 26 L44 26 Q52 26 52 33 Q52 40 43 40 L-38 40 Q-46 40 -46 36 Z" fill="${foot}"/>
+      <path d="M-42 30 Q-48 14 -28 11 Q6 5 34 11 Q56 15 55 28 Q55 31 51 32 L-38 32 Q-42 32 -42 30 Z" fill="${body}"/>
+      <path d="M46 14 Q41 -10 36 -24" stroke="${body}" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+      <path d="M53 16 Q55 1 57 -11" stroke="${body}" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <circle cx="36" cy="-26" r="5.4" fill="${body}"/><circle cx="57" cy="-13" r="4.8" fill="${body}"/>
+      <circle cx="36.5" cy="-27" r="2.3" fill="var(--ink)"/><circle cx="57.4" cy="-14" r="2" fill="var(--ink)"/>
+      <circle cx="-10" cy="-7" r="34" fill="${a}"/><circle cx="-6" cy="-4" r="25" fill="${b}"/>
+      <circle cx="-3" cy="-2" r="17" fill="${c}"/><circle cx="-1" cy="-1" r="9" fill="${b}"/><circle cx="1" cy="0" r="3.6" fill="${a}"/>
+      ${spiralLine}
+      <path d="M-26 -22 Q-12 -34 6 -28" stroke="rgba(255,255,255,.30)" stroke-width="4" fill="none" stroke-linecap="round"/>
+    </g>`;
+  },
+
+  ladybug: ()=>`
+    <ellipse cx="0" cy="20" rx="22" ry="6" fill="rgba(90,70,50,.12)"/>
+    <g stroke="var(--ink)" stroke-width="3" stroke-linecap="round">
+      <path d="M-18 6 L-30 14"/><path d="M-20 14 L-30 22"/><path d="M18 6 L30 14"/><path d="M20 14 L30 22"/>
+    </g>
+    <circle cx="0" cy="6" r="26" fill="#D9574F"/>
+    <path d="M-16 -14 A18 18 0 0 1 16 -14 Q0 -8 -16 -14 Z" fill="var(--ink)"/>
+    <circle cx="-9" cy="-15" r="2.6" fill="#FBEAC9"/><circle cx="9" cy="-15" r="2.6" fill="#FBEAC9"/>
+    <line x1="0" y1="-12" x2="0" y2="28" stroke="var(--ink)" stroke-width="2.6"/>
+    <g fill="var(--ink)"><circle cx="-12" cy="2" r="4"/><circle cx="12" cy="2" r="4"/><circle cx="-9" cy="16" r="3.4"/><circle cx="9" cy="16" r="3.4"/></g>`,
+
+  beetle: ()=>`
+    <ellipse cx="0" cy="22" rx="22" ry="6" fill="rgba(90,70,50,.12)"/>
+    <g stroke="#5A463290" stroke-width="3" stroke-linecap="round">
+      <path d="M-16 2 L-30 -4"/><path d="M-18 10 L-32 8"/><path d="M-16 18 L-30 24"/>
+      <path d="M16 2 L30 -4"/><path d="M18 10 L32 8"/><path d="M16 18 L30 24"/>
+    </g>
+    <ellipse cx="0" cy="6" rx="26" ry="30" fill="#7A5C54"/>
+    <line x1="0" y1="-20" x2="0" y2="34" stroke="#5A4632" stroke-width="2.4"/>
+    <path d="M-18 -16 A20 20 0 0 1 18 -16 Q0 -10 -18 -16 Z" fill="#5A4632"/>
+    <ellipse cx="-9" cy="-2" rx="6" ry="12" fill="rgba(255,255,255,.14)"/>
+    <circle cx="-7" cy="-22" r="2.4" fill="#5A4632"/><circle cx="7" cy="-22" r="2.4" fill="#5A4632"/>`,
+
+  frog: ()=>`
+    <ellipse cx="0" cy="26" rx="26" ry="6" fill="rgba(90,70,50,.12)"/>
+    <g fill="#8FB46A"><ellipse cx="-22" cy="20" rx="9" ry="6"/><ellipse cx="22" cy="20" rx="9" ry="6"/></g>
+    <ellipse cx="0" cy="10" rx="30" ry="24" fill="#8FB46A"/>
+    <ellipse cx="0" cy="22" rx="18" ry="10" fill="#C7D9A0" opacity=".85"/>
+    <circle cx="-13" cy="-14" r="11" fill="#9CC078"/><circle cx="13" cy="-14" r="11" fill="#9CC078"/>
+    <circle cx="-13" cy="-16" r="5" fill="var(--ink)"/><circle cx="13" cy="-16" r="5" fill="var(--ink)"/>
+    <circle cx="-11" cy="-18" r="1.8" fill="#FBEAC9"/><circle cx="15" cy="-18" r="1.8" fill="#FBEAC9"/>
+    <path d="M-12 14 Q0 22 12 14" stroke="#5A463250" stroke-width="2.4" fill="none" stroke-linecap="round"/>`,
+
+  /* the distant bird — faces LEFT (it flies right -> left). Flat silhouette. */
+  bird: ()=>`
+    <g fill="var(--bird)">
+      <ellipse cx="2" cy="0" rx="18" ry="8"/>
+      <circle cx="-15" cy="-2" r="6.5"/>
+      <path d="M-20 -3 L-31 -1 L-20 2 Z"/>
+      <path d="M16 -2 L31 -9 L25 2 Z"/>
+      <path d="M-2 -3 Q-12 -25 -28 -21 Q-14 -10 -4 -2 Z"/>
+      <path d="M4 -3 Q14 -25 30 -19 Q16 -8 6 -2 Z"/>
+    </g>`,
+
+  /* TALONS — we only see the foot. A LONG leg runs off the top of frame so
+     it reads as belonging to an unseen bird above. opts.open splays the claws. */
+  talons: (o)=>{
+    const toes = o.open ? `
+        <path d="M0 -8 C -28 4, -40 20, -46 34"/>
+        <path d="M0 -8 C  28 4,  40 20,  46 34"/>
+        <path d="M0 -8 C  -2 12, -4 26, -6 36"/>`
+      : `
+        <path d="M0 -8 C -22 6, -26 30, -8 44"/>
+        <path d="M0 -8 C  22 6,  26 30,  8 44"/>
+        <path d="M0 -8 C  -2 14, -2 32, 0 46"/>`;
+    const claws = o.open
+      ? `<circle cx="-46" cy="34" r="6"/><circle cx="46" cy="34" r="6"/><circle cx="-6" cy="37" r="6"/>`
+      : `<circle cx="-8" cy="45" r="6"/><circle cx="8" cy="45" r="6"/><circle cx="0" cy="47" r="6"/>`;
+    return `
+      <g fill="none" stroke="var(--talon)" stroke-width="13" stroke-linecap="round">
+        <path d="M0 -220 L0 -8"/>
+        ${toes}
+      </g>
+      <ellipse cx="0" cy="-150" rx="9" ry="14" fill="var(--talon-dk)" opacity=".22"/>
+      <circle cx="0" cy="-8" r="10" fill="var(--talon)"/>
+      <g fill="var(--talon-dk)">${claws}</g>`;
+  },
+
+  /* ---------- CARRY (flight) ---------- */
+  airsky: () => `<rect x="-50" y="-50" width="100" height="100" fill="url(#airGrad)"/>`,
+
+  cloud: ()=>`
+    <g fill="var(--cloud)">
+      <rect x="-44" y="6" width="92" height="24" rx="12"/>
+      <circle cx="-26" cy="6" r="20"/><circle cx="-4" cy="-6" r="26"/><circle cx="22" cy="2" r="22"/><circle cx="8" cy="12" r="18"/>
+    </g>
+    <ellipse cx="2" cy="28" rx="42" ry="7" fill="#9FB6C0" opacity=".22"/>`,
+
+  treetop: ()=>`
+    <rect x="-7" y="20" width="14" height="46" rx="4" fill="#4A3F34"/>
+    <g fill="var(--tree)"><circle cx="-26" cy="2" r="30"/><circle cx="6" cy="-12" r="34"/><circle cx="30" cy="4" r="26"/><circle cx="-2" cy="16" r="30"/></g>
+    <g fill="var(--tree-dk)" opacity=".7"><circle cx="-22" cy="16" r="16"/><circle cx="18" cy="18" r="15"/></g>
+    <g fill="rgba(255,255,255,.10)"><circle cx="4" cy="-16" r="13"/></g>`,
+
+  /* ---------- ARRIVAL (foreign) ---------- */
+  coolSky: () => `<rect x="-50" y="-50" width="100" height="100" fill="url(#coolSkyGrad)"/>`,
+
+  lightShafts: ()=>`
+    <g fill="var(--shaft)">
+      <polygon points="-30,-50 6,-50 40,50 -2,50" opacity=".10"/>
+      <polygon points="2,-50 30,-50 52,50 18,50" opacity=".08"/>
+      <polygon points="-50,-50 -22,-50 -2,50 -34,50" opacity=".07"/>
+      <polygon points="20,-50 40,-50 60,50 36,50" opacity=".05"/>
+    </g>`,
+
+  coolGround: ()=>`
+    <path d="M-50 4 Q-50 -22 -22 -28 Q0 -32 22 -28 Q50 -22 50 6 L50 50 L-50 50 Z" fill="url(#coolGroundGrad)"/>
+    <ellipse cx="-4" cy="-18" rx="34" ry="7" fill="#9FD0BC" opacity=".10"/>
+    <g fill="#1F2A24" opacity=".4"><ellipse cx="-30" cy="6" rx="12" ry="4"/><ellipse cx="26" cy="10" rx="14" ry="4"/></g>`,
+
+  log: ()=>`
+    <rect x="-50" y="-16" width="100" height="40" rx="20" fill="url(#logGrad)"/>
+    <rect x="-44" y="-13" width="66" height="9" rx="4.5" fill="var(--log-light)" opacity=".55"/>
+    <ellipse cx="44" cy="4" rx="9" ry="20" fill="var(--log-shade)"/>
+    <ellipse cx="44" cy="4" rx="5" ry="12" fill="var(--log-base)"/>
+    <ellipse cx="44" cy="4" rx="2" ry="5" fill="var(--log-shade)"/>
+    <g fill="var(--lichen-a)"><ellipse cx="-22" cy="-12" rx="11" ry="4.5"/><ellipse cx="6" cy="-13" rx="8" ry="3.6"/><ellipse cx="-2" cy="14" rx="9" ry="3.4"/></g>
+    <g fill="var(--lichen-b)" opacity=".85"><circle cx="-26" cy="-13" r="2.6"/><circle cx="10" cy="-12" r="2.2"/><circle cx="-30" cy="2" r="2"/></g>`,
+
+  fern: (o)=>{
+    const c = o.tone==="far" ? "var(--fern-far)" : o.tone==="mid" ? "var(--fern-mid)" : "var(--fern-near)";
+    const flip = o.flip ? `transform="scale(-1,1)"` : "";
+    return `
+    <g ${flip} stroke="${c}" stroke-width="4" fill="none" stroke-linecap="round">
+      <path d="M0 50 Q-6 6 -16 -22"/>
+      <path d="M-2 34 q -14 -4 -21 -12"/><path d="M-4 22 q -14 -4 -20 -12"/>
+      <path d="M-7 8 q -13 -5 -18 -12"/><path d="M-10 -6 q -11 -5 -15 -12"/>
+      <path d="M-2 34 q 12 -6 18 -14"/><path d="M-5 22 q 12 -6 17 -13"/><path d="M-8 8 q 11 -6 15 -12"/>
+      <path d="M-16 -22 q -11 -2 -10 9 q 1 8 9 6 q 5 -2 3 -8"/>
+    </g>`;
+  },
+
+  frond: (o)=>{
+    const c = o.tone==="far" ? "var(--fern-far)" : "var(--fern-mid)";
+    const flip = o.flip ? `transform="scale(-1,1)"` : "";
+    return `
+    <g ${flip}>
+      <g fill="${c}"><circle cx="-18" cy="-10" r="30"/><circle cx="12" cy="-22" r="26"/><circle cx="28" cy="2" r="22"/><circle cx="-2" cy="10" r="28"/></g>
+      <g stroke="${c}" stroke-width="4" fill="none" stroke-linecap="round" opacity=".9">
+        <path d="M-8 8 Q-2 30 -16 48"/><path d="M10 6 Q18 28 8 50"/><path d="M24 2 Q34 22 30 44"/>
+      </g>
+    </g>`;
+  },
+
+  glowMushroom: (o)=>{
+    const cap = o.cap==="violet" ? "#C8BEE2" : "#B7E6D2";
+    const dot = o.cap==="violet" ? "#EDE7F6" : "#EAFBF1";
+    return `
+    <circle cx="0" cy="-4" r="34" fill="url(#glowGrad)"/>
+    <path d="M-6 46 Q-9 6 0 4 Q9 6 6 46 Z" fill="var(--glow-stem)"/>
+    <path d="M-8 45 Q-9 18 0 16 L0 46 Z" fill="#9FC4B5" opacity=".5"/>
+    <path d="M-26 6 Q0 -28 26 6 Q0 18 -26 6 Z" fill="${cap}"/>
+    <g fill="${dot}"><circle cx="-11" cy="-2" r="3.4"/><circle cx="8" cy="-6" r="3"/><circle cx="16" cy="3" r="2.4"/><circle cx="-2" cy="5" r="2.2"/></g>`;
+  },
+
+  /* SLUG — shell-less, smooth, cool. faces right. opts.flip mirrors. */
+  slug: (o)=>{
+    const body = o.body||"#9FD0BC", foot=o.foot||"#84B7A2", ridge=o.ridge||"#6FA08C", eye=o.eye||"#34463E";
+    const flip = o.flip ? `transform="scale(-1,1)"` : "";
+    return `
+    <g ${flip}>
+      <path d="M-46 30 Q-50 22 -40 22 L42 22 Q50 22 50 29 Q50 36 42 36 L-40 36 Q-46 36 -46 30 Z" fill="${foot}"/>
+      <path d="M-44 26 Q-52 2 -28 -6 Q-4 -14 22 -8 Q50 -2 53 18 Q53 24 49 26 L-40 27 Q-44 27 -44 26 Z" fill="${body}"/>
+      <path d="M-30 -2 Q-6 -9 18 -4" stroke="${ridge}" stroke-width="2.6" fill="none" stroke-linecap="round" opacity=".8"/>
+      <path d="M44 6 Q40 -16 34 -28" stroke="${body}" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M51 9 Q54 -6 56 -17" stroke="${body}" stroke-width="4.4" fill="none" stroke-linecap="round"/>
+      <circle cx="34" cy="-29" r="4.6" fill="${body}"/><circle cx="56" cy="-18" r="4.2" fill="${body}"/>
+      <circle cx="34.4" cy="-30" r="2" fill="${eye}"/><circle cx="56.3" cy="-19" r="1.8" fill="${eye}"/>
+      <path d="M48 22 q7 4 10 11" stroke="${body}" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+      <path d="M43 24 q6 5 8 12" stroke="${body}" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M-26 -6 Q-8 -16 14 -10" stroke="rgba(255,255,255,.35)" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <ellipse cx="-30" cy="14" rx="12" ry="4" fill="rgba(255,255,255,.16)"/>
+    </g>`;
+  },
+
+  foreignLeaf: ()=>`
+    <path d="M-48 8 Q-42 8 -32 4" stroke="var(--fern-mid)" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M-34 4 Q-16 -34 24 -26 Q48 -20 50 0 Q49 22 10 32 Q-30 36 -34 4 Z" fill="var(--fern-near)"/>
+    <path d="M-26 4 Q-8 -24 22 -16 Q40 -10 42 2 Q40 18 8 25 Q-22 26 -26 4 Z" fill="#A6CDB6" opacity=".7"/>
+    <path d="M-30 4 Q8 0 50 0" stroke="var(--fern-mid)" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <g stroke="var(--fern-mid)" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".8">
+      <path d="M-12 3 Q-6 -12 4 -16"/><path d="M6 2 Q14 -8 26 -10"/><path d="M22 1 Q30 -4 38 -4"/>
+      <path d="M-10 4 Q-6 16 2 22"/><path d="M10 3 Q16 14 24 18"/>
+    </g>`,
+};
+
+/* ----------------- GO ----------------- */
+play();
+</script>
+</body>
+</html>

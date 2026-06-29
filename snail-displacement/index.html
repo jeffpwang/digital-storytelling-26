@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Snail Dispersal — A Field Guide</title>
+<style>
+  :root{
+    --paper:#f4efe1;
+    --plate:#fbf7ec;
+    --ink:#3a352c;
+    --soft:#7c7665;
+    --rule:#d9d0ba;
+    --moss:#7d9a5b;
+    --ochre:#d59a3c;
+    --sky:#6f9bb5;
+    --clay:#c8794f;
+    --serif:'Iowan Old Style','Palatino Linotype','Book Antiqua',Palatino,Georgia,serif;
+    --label:'Iowan Old Style',Georgia,serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--serif);
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+    /* faint paper grain + soft vignette */
+    background-image:
+      radial-gradient(120% 90% at 50% 18%, rgba(255,255,255,.5), transparent 60%),
+      radial-gradient(140% 120% at 50% 110%, rgba(120,108,80,.10), transparent 60%);
+  }
+
+  #deck{position:fixed;inset:0;display:flex;flex-direction:column;cursor:pointer}
+  #viewport{flex:1;overflow:hidden;position:relative}
+  #track{display:flex;height:100%;transition:transform .62s cubic-bezier(.5,.02,.2,1)}
+  .slide{min-width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:24px}
+
+  /* field-guide plate */
+  .plate{
+    position:relative;
+    width:min(86vw,780px);
+    min-height:min(74vh,560px);
+    background:var(--plate);
+    border:1px solid var(--rule);
+    border-radius:6px;
+    box-shadow:0 1px 0 #fff inset, 0 18px 50px -28px rgba(60,50,30,.5);
+    padding:46px 56px 56px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;
+    outline:6px solid var(--plate);          /* double-rule trick */
+    outline-offset:-13px;
+  }
+  .plate::after{                              /* inner hairline rule */
+    content:"";position:absolute;inset:9px;border:1px solid var(--rule);border-radius:3px;pointer-events:none;
+  }
+
+  .figtag{
+    position:absolute;top:16px;left:20px;
+    font-family:var(--label);font-size:12px;letter-spacing:.22em;
+    color:var(--soft);text-transform:uppercase;
+  }
+  .pageno{
+    position:absolute;top:16px;right:20px;
+    font-family:var(--label);font-size:12px;letter-spacing:.18em;color:var(--soft);
+  }
+
+  .eyebrow{font-size:13px;letter-spacing:.34em;text-transform:uppercase;color:var(--moss);margin-bottom:18px}
+  h1{font-size:clamp(30px,5.4vw,52px);font-weight:600;line-height:1.05;letter-spacing:.01em}
+  h2{font-size:clamp(24px,3.6vw,34px);font-weight:600;line-height:1.12;margin-bottom:4px}
+  .sub{font-style:italic;color:var(--soft);font-size:clamp(15px,2vw,19px);margin-top:14px}
+  .body{font-size:clamp(16px,2.1vw,20px);line-height:1.6;max-width:30em;margin-top:8px;color:#46402f}
+  .caption{font-style:italic;color:var(--soft);font-size:15px;margin-top:22px;line-height:1.5;max-width:26em}
+  .fig{margin:6px 0 18px}
+  .placeholder{color:var(--clay);font-style:italic}
+
+  /* entrance animation */
+  .rise{opacity:0;transform:translateY(16px);transition:opacity .6s ease,transform .6s ease}
+  .slide.is-active .rise{opacity:1;transform:none}
+  .slide.is-active .rise:nth-child(1){transition-delay:.05s}
+  .slide.is-active .rise:nth-child(2){transition-delay:.14s}
+  .slide.is-active .rise:nth-child(3){transition-delay:.23s}
+  .slide.is-active .rise:nth-child(4){transition-delay:.32s}
+  .slide.is-active .rise:nth-child(5){transition-delay:.40s}
+
+  /* nav */
+  #nav{height:64px;display:flex;align-items:center;justify-content:center;gap:18px;position:relative}
+  .dots{display:flex;gap:10px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--rule);transition:background .3s,transform .3s}
+  .dot.on{background:var(--ochre);transform:scale(1.25)}
+  .chev{
+    position:absolute;top:50%;transform:translateY(-50%);
+    border:none;background:none;color:var(--soft);font-family:var(--serif);
+    font-size:30px;cursor:pointer;padding:6px 14px;line-height:1;opacity:.6;transition:opacity .25s,color .25s}
+  .chev:hover{opacity:1;color:var(--ink)}
+  .chev.prev{left:max(18px,4vw)} .chev.next{right:max(18px,4vw)}
+  .chev[disabled]{opacity:.12;cursor:default}
+  #hint{
+    position:fixed;bottom:18px;left:50%;transform:translateX(-50%);
+    font-family:var(--label);font-size:12px;letter-spacing:.22em;color:var(--soft);
+    text-transform:uppercase;opacity:.7;pointer-events:none}
+
+  /* whimsy: idle motion */
+  .snail-body{animation:bob 3.6s ease-in-out infinite;transform-origin:center}
+  @keyframes bob{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-4px) rotate(-.8deg)}}
+  .eyes{animation:wig 4.2s ease-in-out infinite;transform-origin:118px 60px}
+  @keyframes wig{0%,100%{transform:rotate(0)}40%{transform:rotate(5deg)}70%{transform:rotate(-3deg)}}
+  .ripple{transform-origin:center;animation:rip 4s ease-in-out infinite}
+  @keyframes rip{0%,100%{opacity:.18}50%{opacity:.5}}
+  .trail{stroke-dasharray:2 7;animation:march 9s linear infinite}
+  @keyframes march{to{stroke-dashoffset:-90}}
+</style>
+</head>
+<body>
+<div id="deck">
+  <div id="viewport">
+    <div id="track">
+
+      <!-- 0 · COVER -->
+      <section class="slide">
+        <div class="plate">
+          <span class="figtag">Field Studies in Movement</span>
+          <span class="pageno">No. 1</span>
+          <div class="fig rise">
+            <svg width="220" height="150" viewBox="0 0 150 100" aria-hidden="true">
+              <ellipse cx="75" cy="92" rx="46" ry="6" fill="rgba(120,108,80,.14)"/>
+              <path class="trail" d="M14,86 q-2,-8 8,-9" fill="none" stroke="#9a6326" stroke-width="3" stroke-linecap="round"/>
+              <g class="snail-body">
+                <ellipse cx="66" cy="80" rx="52" ry="12" fill="#cfe3c2" stroke="#6f8f5f" stroke-width="2.5"/>
+                <ellipse cx="112" cy="71" rx="16" ry="14" fill="#cfe3c2" stroke="#6f8f5f" stroke-width="2.5"/>
+                <g class="eyes" stroke="#6f8f5f" stroke-width="4" stroke-linecap="round">
+                  <line x1="116" y1="60" x2="124" y2="42"/><line x1="106" y1="60" x2="110" y2="46"/>
+                  <circle cx="125" cy="40" r="4" fill="#3a352c" stroke="none"/>
+                  <circle cx="110" cy="44" r="3.4" fill="#3a352c" stroke="none"/>
+                </g>
+              </g>
+              <g>
+                <circle cx="50" cy="50" r="30" fill="#ecc06a" stroke="#9a6326" stroke-width="3"/>
+                <circle cx="53" cy="51" r="21" fill="none" stroke="#cf923a" stroke-width="4"/>
+                <circle cx="56" cy="52" r="12" fill="none" stroke="#cf923a" stroke-width="4"/>
+                <circle cx="58" cy="53" r="4.5" fill="#cf923a"/>
+              </g>
+            </svg>
+          </div>
+          <div class="eyebrow rise">A Field Guide · Lecture One</div>
+          <h1 class="rise">How Far Does a Snail Go?</h1>
+          <div class="sub rise">Defining <em>dispersal range</em></div>
+        </div>
+      </section>
+
+      <!-- 1 · WHAT IS DISPERSAL -->
+      <section class="slide">
+        <div class="plate">
+          <span class="figtag">Fig. 1</span>
+          <span class="pageno">2</span>
+          <div class="fig rise">
+            <svg width="320" height="130" viewBox="0 0 320 130" aria-hidden="true">
+              <!-- origin: a little leaf -->
+              <path d="M30,96 C18,80 30,62 50,66 C46,86 40,96 30,96 Z" fill="#9fbf78" stroke="#6f8f5f" stroke-width="2"/>
+              <line x1="33" y1="94" x2="48" y2="72" stroke="#6f8f5f" stroke-width="1.6"/>
+              <!-- dotted journey -->
+              <path class="trail" d="M52,92 C110,52 170,118 250,80" fill="none" stroke="#b89a5e" stroke-width="3" stroke-linecap="round"/>
+              <!-- snail arriving -->
+              <g transform="translate(232,52) scale(.62)">
+                <g class="snail-body">
+                  <ellipse cx="66" cy="80" rx="52" ry="12" fill="#cfe3c2" stroke="#6f8f5f" stroke-width="3"/>
+                  <ellipse cx="112" cy="71" rx="16" ry="14" fill="#cfe3c2" stroke="#6f8f5f" stroke-width="3"/>
+                  <g class="eyes" stroke="#6f8f5f" stroke-width="5" stroke-linecap="round">
+                    <line x1="116" y1="60" x2="124" y2="42"/><line x1="106" y1="60" x2="110" y2="46"/>
+                    <circle cx="125" cy="40" r="5" fill="#3a352c" stroke="none"/>
+                    <circle cx="110" cy="44" r="4" fill="#3a352c" stroke="none"/>
+                  </g>
+                </g>
+                <circle cx="50" cy="50" r="30" fill="#ecc06a" stroke="#9a6326" stroke-width="3.4"/>
+                <circle cx="53" cy="51" r="21" fill="none" stroke="#cf923a" stroke-width="4.6"/>
+                <circle cx="56" cy="52" r="12" fill="none" stroke="#cf923a" stroke-width="4.6"/>
+                <circle cx="58" cy="53" r="5" fill="#cf923a"/>
+              </g>
+            </svg>
+          </div>
+          <h2 class="rise">First, dispersal.</h2>
+          <p class="body rise">Dispersal is the journey an animal makes away from the place it was born — out to wherever it will finally live, feed, and raise its own.</p>
+          <p class="caption rise">Every creature does it. Few do it as slowly as a snail.</p>
+        </div>
+      </section>
+
+      <!-- 2 · DISPERSAL RANGE -->
+      <section class="slide">
+        <div class="plate">
+          <span class="figtag">Fig. 2</span>
+          <span class="pageno">3</span>
+          <div class="fig rise">
+            <svg width="300" height="190" viewBox="0 0 300 190" aria-hidden="true">
+              <!-- the personal map: concentric rings -->
+              <g fill="none" stroke="#6f9bb5" stroke-width="1.6">
+                <circle class="ripple" cx="120" cy="98" r="78" style="animation-delay:0s"/>
+                <circle class="ripple" cx="120" cy="98" r="56" style="animation-delay:.5s"/>
+                <circle class="ripple" cx="120" cy="98" r="34" style="animation-delay:1s"/>
+              </g>
+              <!-- birthplace -->
+              <circle cx="120" cy="98" r="5" fill="#c8794f"/>
+              <text x="120" y="123" text-anchor="middle" font-family="var(--label)" font-size="11" fill="#7c7665" letter-spacing="2">BORN HERE</text>
+              <!-- radius = range -->
+              <line x1="120" y1="98" x2="198" y2="98" stroke="#c8794f" stroke-width="2" stroke-dasharray="4 4"/>
+              <text x="158" y="90" text-anchor="middle" font-family="var(--serif)" font-style="italic" font-size="15" fill="#c8794f">range</text>
+              <!-- snail at the rim -->
+              <g transform="translate(176,70) scale(.5)">
+                <g class="snail-body">
+                  <ellipse cx="66" cy="80" rx="52" ry="12" fill="#cfe3c2" stroke="#6f8f5f" stroke-width="3"/>
+                  <ellipse cx="112" cy="71" rx="16" ry="14" fill="#cfe3c2" stroke="#6f8f5f" stroke-width="3"/>
+                  <g class="eyes" stroke="#6f8f5f" stroke-width="5" stroke-linecap="round">
+                    <line x1="116" y1="60" x2="124" y2="42"/><line x1="106" y1="60" x2="110" y2="46"/>
+                    <circle cx="125" cy="40" r="5" fill="#3a352c" stroke="none"/>
+                  </g>
+                </g>
+                <circle cx="50" cy="50" r="30" fill="#ecc06a" stroke="#9a6326" stroke-width="3.4"/>
+                <circle cx="53" cy="51" r="21" fill="none" stroke="#cf923a" stroke-width="4.6"/>
+                <circle cx="56" cy="52" r="12" fill="none" stroke="#cf923a" stroke-width="4.6"/>
+              </g>
+            </svg>
+          </div>
+          <h2 class="rise">Now, its range.</h2>
+          <p class="body rise">An individual's <em>dispersal range</em> is the distance it covers from that birthplace across its whole life — the radius of its small, personal map.</p>
+          <p class="caption rise">Draw a circle around where it started. That circle is its world.</p>
+        </div>
+      </section>
+
+      <!-- 3 · SMALL CIRCLE / TEASER -->
+      <section class="slide">
+        <div class="plate">
+          <span class="figtag">Fig. 3</span>
+          <span class="pageno">4</span>
+          <div class="fig rise">
+            <svg width="300" height="170" viewBox="0 0 300 170" aria-hidden="true">
+              <!-- a wide faint world, a tiny circle inside it -->
+              <circle cx="150" cy="86" r="74" fill="none" stroke="var(--rule)" stroke-width="1.5" stroke-dasharray="3 6"/>
+              <circle cx="150" cy="86" r="20" fill="rgba(111,155,181,.10)" stroke="#6f9bb5" stroke-width="1.6"/>
+              <!-- measuring bracket -->
+              <g stroke="#c8794f" stroke-width="1.6">
+                <line x1="130" y1="120" x2="170" y2="120"/>
+                <line x1="130" y1="116" x2="130" y2="124"/><line x1="170" y1="116" x2="170" y2="124"/>
+              </g>
+              <text x="150" y="138" text-anchor="middle" font-family="var(--serif)" font-style="italic" font-size="13" fill="#c8794f">a few paces</text>
+              <!-- tiny snail inside -->
+              <g transform="translate(140,74) scale(.34)">
+                <g class="snail-body">
+                  <ellipse cx="66" cy="80" rx="52" ry="12" fill="#cfe3c2" stroke="#6f8f5f" stroke-width="3.5"/>
+                  <ellipse cx="112" cy="71" rx="16" ry="14" fill="#cfe3c2" stroke="#6f8f5f" stroke-width="3.5"/>
+                  <g class="eyes" stroke="#6f8f5f" stroke-width="6" stroke-linecap="round">
+                    <line x1="116" y1="60" x2="124" y2="42"/><circle cx="125" cy="40" r="6" fill="#3a352c" stroke="none"/>
+                  </g>
+                </g>
+                <circle cx="50" cy="50" r="30" fill="#ecc06a" stroke="#9a6326" stroke-width="4"/>
+                <circle cx="53" cy="51" r="21" fill="none" stroke="#cf923a" stroke-width="5"/>
+                <circle cx="56" cy="52" r="12" fill="none" stroke="#cf923a" stroke-width="5"/>
+              </g>
+            </svg>
+          </div>
+          <h2 class="rise">And a snail's circle is small.</h2>
+          <p class="body rise">Small enough to pace out in an afternoon.
+            <span class="placeholder">[PLACEHOLDER — your figure, e.g. about 1–5 meters across a lifetime.]</span></p>
+          <p class="caption rise">So let's go down and look. ›</p>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <div id="nav">
+    <button class="chev prev" aria-label="previous">‹</button>
+    <div class="dots"></div>
+    <button class="chev next" aria-label="next">›</button>
+  </div>
+</div>
+<div id="hint">click anywhere to continue ›</div>
+
+<script>
+"use strict";
+const slides = Array.from(document.querySelectorAll('.slide'));
+const track  = document.getElementById('track');
+const dotsEl = document.querySelector('.dots');
+const prevBtn= document.querySelector('.chev.prev');
+const nextBtn= document.querySelector('.chev.next');
+const hint   = document.getElementById('hint');
+let i = 0;
+
+// build dots
+slides.forEach((_,k)=>{ const d=document.createElement('span'); d.className='dot'; dotsEl.appendChild(d); });
+const dots = Array.from(document.querySelectorAll('.dot'));
+
+function render(){
+  track.style.transform = `translateX(${-i*100}%)`;
+  slides.forEach((s,k)=>s.classList.toggle('is-active', k===i));
+  dots.forEach((d,k)=>d.classList.toggle('on', k===i));
+  prevBtn.disabled = i===0;
+  nextBtn.disabled = i===slides.length-1;
+  hint.textContent = i===slides.length-1 ? '— to be continued —' : 'click anywhere to continue ›';
+}
+function go(n){ i = Math.max(0, Math.min(slides.length-1, n)); render(); }
+
+// advance on click anywhere (except the back chevron)
+document.getElementById('deck').addEventListener('click', e=>{
+  if(e.target.closest('.chev.prev')){ go(i-1); return; }
+  if(e.target.closest('.chev.next')){ go(i+1); return; }
+  go(i+1);
+});
+window.addEventListener('keydown', e=>{
+  if(e.key==='ArrowRight'||e.key===' '){ e.preventDefault(); go(i+1); }
+  else if(e.key==='ArrowLeft'){ go(i-1); }
+  else if(e.key.toLowerCase()==='r'){ go(0); }
+});
+
+render();
+</script>
+</body>
+</html>
