@@ -155,6 +155,7 @@
   }
   @keyframes fadeUp{ from{opacity:0;} to{opacity:1;} }
   @keyframes breathe{ 0%,100%{transform:scale(1,1);} 50%{transform:scale(1.035,.965);} }
+  @keyframes breathePulse{ 0%,100%{transform:scale(1);} 50%{transform:scale(1.03);} }
   @keyframes bob{ 0%,100%{transform:translateY(0);} 50%{transform:translateY(-3px);} }
   @keyframes sway{ 0%,100%{transform:rotate(-1.4deg);} 50%{transform:rotate(1.4deg);} }
   @keyframes flap{ 0%,100%{transform:scaleY(1);} 50%{transform:scaleY(.6);} }
@@ -168,6 +169,111 @@
     85%{opacity:.5;} 100%{transform:translate(var(--dx),var(--dy));opacity:0;}
   }
   @media (prefers-reduced-motion: reduce){ .idle{animation:none !important;} }
+
+  /* ============================================================
+     STAGING / ASSET EDITOR
+     ============================================================ */
+  #stageToggle{
+    position:fixed;left:18px;bottom:16px;
+    display:flex;align-items:center;gap:8px;
+    background:rgba(240,232,220,.5);color:#2a2018;
+    border:1px solid rgba(255,255,255,.18);
+    padding:9px 14px;border-radius:999px;
+    font-size:13px;letter-spacing:.06em;cursor:pointer;
+    opacity:.4;transition:opacity .3s ease,background .3s ease,color .3s ease;
+    backdrop-filter:blur(3px);
+  }
+  #stageToggle:hover{opacity:1;}
+  #stageToggle.active{
+    background:rgba(0,212,255,.18);color:#00d4ff;
+    border-color:rgba(0,212,255,.4);opacity:1;
+  }
+
+  /* Panel — fixed to the right of the scene square */
+  #stageModeUI{
+    position:fixed;
+    top:calc(50% - min(50vw,50vh));
+    left:calc(50% + min(50vw,50vh) + 10px);
+    width:176px;height:min(100vw,100vh);
+    display:none;flex-direction:column;gap:6px;
+    z-index:200;
+  }
+  #stageModeUI.visible{display:flex;}
+
+  #phaseTabs{display:flex;gap:4px;}
+  .phaseTab{
+    flex:1;padding:6px 4px;border-radius:8px;
+    background:rgba(16,12,8,.85);color:rgba(255,255,255,.55);
+    border:1px solid rgba(255,255,255,.14);font-size:11px;
+    letter-spacing:.06em;cursor:pointer;
+    transition:background .2s,color .2s,border-color .2s;
+  }
+  .phaseTab:hover{color:rgba(255,255,255,.85);}
+  .phaseTab.active{
+    background:rgba(0,212,255,.22);color:#00d4ff;
+    border-color:rgba(0,212,255,.45);
+  }
+
+  #frameRow{display:flex;gap:4px;}
+  .frameBtn{
+    flex:1;padding:4px 2px;border-radius:6px;
+    background:rgba(255,255,255,.07);color:rgba(255,255,255,.38);
+    border:1px solid rgba(255,255,255,.1);font-size:10px;
+    letter-spacing:.05em;cursor:pointer;transition:background .15s;
+  }
+  .frameBtn.hi{background:rgba(0,212,255,.15);color:#00d4ff;border-color:rgba(0,212,255,.3);}
+
+  #inspector{
+    flex:1;min-height:0;
+    background:rgba(14,10,7,.9);border-radius:10px;
+    border:1px solid rgba(255,255,255,.1);
+    display:flex;flex-direction:column;
+    backdrop-filter:blur(6px);overflow:hidden;
+  }
+  #inspInner{
+    flex:1;padding:12px;overflow-y:auto;
+    display:flex;flex-direction:column;gap:7px;
+  }
+  #inspEmpty{
+    color:rgba(255,255,255,.28);font-size:11px;
+    text-align:center;margin-top:24px;line-height:1.7;
+  }
+  #inspContent{display:flex;flex-direction:column;gap:7px;}
+  #assetLabel{
+    font-size:11px;color:rgba(0,212,255,.9);
+    letter-spacing:.06em;font-weight:600;
+    padding-bottom:4px;word-break:break-all;
+  }
+  .inspRow{
+    display:flex;justify-content:space-between;align-items:center;
+  }
+  .inspRow label{color:rgba(255,255,255,.38);font-size:11px;letter-spacing:.04em;}
+  .inspRow span{color:rgba(255,255,255,.88);font-size:12px;font-family:monospace;}
+  .inspSep{height:1px;background:rgba(255,255,255,.08);margin:2px 0;}
+  .inspBtnRow{display:flex;gap:4px;}
+  .inspBtn{
+    flex:1;padding:5px 3px;border-radius:6px;
+    background:rgba(255,255,255,.07);color:rgba(255,255,255,.65);
+    border:1px solid rgba(255,255,255,.11);font-size:11px;
+    cursor:pointer;transition:background .15s;white-space:nowrap;
+  }
+  .inspBtn:hover{background:rgba(255,255,255,.15);}
+  .inspBtn.full{flex:none;width:100%;}
+  .inspBtn.hi{background:rgba(0,212,255,.15);color:#00d4ff;border-color:rgba(0,212,255,.3);}
+  .inspHint{
+    font-size:10px;color:rgba(255,255,255,.25);line-height:1.6;
+    letter-spacing:.02em;
+  }
+  #exportArea{
+    padding:10px 12px;border-top:1px solid rgba(255,255,255,.08);
+    display:flex;flex-direction:column;gap:5px;
+  }
+  #saveStatus{
+    font-size:10px;text-align:center;min-height:14px;
+    color:rgba(0,212,255,.6);letter-spacing:.04em;
+  }
+  .inspBtn.danger{color:rgba(255,110,110,.7);border-color:rgba(255,110,110,.2);}
+  .inspBtn.danger:hover{background:rgba(255,80,80,.12);}
 </style>
 </head>
 <body>
@@ -179,6 +285,63 @@
     <div id="vignette"></div>
     <div id="fadeblack"></div>
     <div id="caption">home</div>
+
+  </div>
+
+  <!-- STAGING MODE UI — outside #stage so not clipped by overflow:hidden -->
+  <div id="stageModeUI">
+    <div id="phaseTabs">
+      <button class="phaseTab" data-phase="HOME"    onclick="buildStagingPhase('HOME')">HOME</button>
+      <button class="phaseTab" data-phase="CARRY"   onclick="buildStagingPhase('CARRY')">CARRY</button>
+      <button class="phaseTab" data-phase="ARRIVAL" onclick="buildStagingPhase('ARRIVAL')">ARRIVAL</button>
+    </div>
+    <div id="frameRow">
+      <button class="frameBtn hi" id="pmEnd"   onclick="setPathMode('end')">rest pos</button>
+      <button class="frameBtn"    id="pmStart" onclick="setPathMode('start')">crawl start</button>
+    </div>
+    <div id="inspector">
+      <div id="inspInner">
+        <div id="inspEmpty">click an asset<br><span style="font-size:10px">to select &amp; reposition</span></div>
+        <div id="inspContent" style="display:none">
+          <div id="assetLabel"></div>
+          <div class="inspRow"><label>x</label><span id="iX"></span></div>
+          <div class="inspRow"><label>y</label><span id="iY"></span></div>
+          <div class="inspRow"><label>w</label><span id="iW"></span></div>
+          <div class="inspRow"><label>h</label><span id="iH"></span></div>
+          <div class="inspRow"><label>rot</label><span id="iRot">0°</span></div>
+          <div class="inspSep"></div>
+          <div class="inspBtnRow">
+            <button class="inspBtn" onclick="scaleAsset(1.1)">+10%</button>
+            <button class="inspBtn" onclick="scaleAsset(0.9)">−10%</button>
+          </div>
+          <div class="inspBtnRow">
+            <button class="inspBtn" onclick="scaleAsset(1.05)">+5%</button>
+            <button class="inspBtn" onclick="scaleAsset(0.95)">−5%</button>
+          </div>
+          <div class="inspSep"></div>
+          <div class="inspBtnRow">
+            <button class="inspBtn" onclick="rotateAsset(-15)">↺ 15°</button>
+            <button class="inspBtn" onclick="rotateAsset(-5)">↺ 5°</button>
+            <button class="inspBtn" onclick="rotateAsset(5)">↻ 5°</button>
+            <button class="inspBtn" onclick="rotateAsset(15)">↻ 15°</button>
+          </div>
+          <button class="inspBtn full" onclick="resetRot()" style="margin-top:3px">reset rotation</button>
+          <div class="inspSep"></div>
+          <button class="inspBtn full" id="flipBtn" onclick="toggleFlip()">flip ⟺</button>
+          <div class="inspSep"></div>
+          <div class="inspHint">drag to move<br>arrows nudge ×1<br>shift+arrows ×10</div>
+        </div>
+      </div>
+      <div id="exportArea">
+        <div id="saveStatus"></div>
+        <button class="inspBtn full" onclick="_exportJSON()">export .json</button>
+        <label class="inspBtn full" style="display:block;text-align:center;cursor:pointer;padding:5px 3px">
+          import .json
+          <input type="file" accept=".json" style="display:none" onchange="_importJSON(this)">
+        </label>
+        <button class="inspBtn full danger" onclick="_clearOverrides()">reset to defaults</button>
+      </div>
+    </div>
   </div>
 
   <button id="replay" title="Replay">
@@ -188,6 +351,7 @@
     </svg>
     replay
   </button>
+  <button id="stageToggle" onclick="toggleStaging()">edit</button>
 
 <script>
 /* ==================================================================
@@ -277,20 +441,20 @@ const ASSETS_HOME = [
   { id:"grass-1", type:"grass", layer:5, x:300, y:560, w:150, h:120, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1400, idle:"sway", idleDur:7, idleDelay:0 },
   { id:"grass-2", type:"grass", layer:5, x:910, y:580, w:160, h:130, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1560, idle:"sway", idleDur:8, idleDelay:1.5 },
 
-  { id:"snail-coral", type:"snail", layer:6, x:430, y:506, w:128, h:112, anchor:{ax:.5,ay:.86}, src:null, intro:"pop", delay:2000, idle:"breathe", idleDur:5, idleDelay:.3, opts:SHELL.coral },
-  { id:"snail-gold", type:"snail", layer:6, x:792, y:530, w:118, h:104, anchor:{ax:.5,ay:.86}, src:null, intro:"pop", delay:2200, idle:"breathe", idleDur:5.6, idleDelay:1.2, opts:{...SHELL.gold, flip:true} },
-  { id:"snail-sage", type:"snail", layer:6, x:548, y:486, w:92, h:82, anchor:{ax:.5,ay:.86}, src:null, intro:"pop", delay:2380, idle:"breathe", idleDur:6, idleDelay:.8, opts:SHELL.sage },
-  { id:"snail-rose", type:"snail", layer:6, x:706, y:478, w:80, h:72, anchor:{ax:.5,ay:.86}, src:null, intro:"pop", delay:2520, idle:"breathe", idleDur:5.2, idleDelay:1.9, opts:{...SHELL.rose, flip:true} },
-  { id:"ladybug", type:"ladybug", layer:6, x:512, y:548, w:64, h:60, anchor:{ax:.5,ay:.7}, src:null, intro:"pop", delay:2100, idle:"bob", idleDur:3.4, idleDelay:.5 },
-  { id:"beetle", type:"beetle", layer:6, x:636, y:560, w:78, h:72, anchor:{ax:.5,ay:.7}, src:null, intro:"pop", delay:2260, idle:"bob", idleDur:3.8, idleDelay:1.4 },
-  { id:"frog", type:"frog", layer:6, x:830, y:512, w:104, h:96, anchor:{ax:.5,ay:.82}, src:null, intro:"pop", delay:2440, idle:"breathe", idleDur:4.4, idleDelay:.2 },
+  { id:"snail-coral", type:"snail", layer:6, x:430, y:506, w:128, h:112, anchor:{ax:.5,ay:.86}, src:"assets/snail-coral.png", intro:"pop", delay:2000, idle:"breathe", idleDur:5, idleDelay:.3, opts:SHELL.coral },
+  { id:"snail-gold", type:"snail", layer:6, x:792, y:530, w:118, h:104, anchor:{ax:.5,ay:.86}, src:"assets/snail-gold.png", intro:"pop", delay:2200, idle:"breathe", idleDur:5.6, idleDelay:1.2, opts:{...SHELL.gold, flip:true} },
+  { id:"snail-sage", type:"snail", layer:6, x:548, y:486, w:92, h:82, anchor:{ax:.5,ay:.86}, src:"assets/snail-jade.png", intro:"pop", delay:2380, idle:"breathe", idleDur:6, idleDelay:.8, opts:SHELL.sage },
+  { id:"snail-rose", type:"snail", layer:6, x:706, y:478, w:80, h:72, anchor:{ax:.5,ay:.86}, src:"assets/snail-rose.png", intro:"pop", delay:2520, idle:"breathe", idleDur:5.2, idleDelay:1.9, opts:{...SHELL.rose, flip:true} },
+  { id:"ladybug", type:"ladybug", layer:6, x:512, y:548, w:64, h:60, anchor:{ax:.5,ay:.7}, src:"assets/ladybug.png", intro:"pop", delay:2100, idle:"bob", idleDur:3.4, idleDelay:.5 },
+  { id:"beetle", type:"beetle", layer:6, x:636, y:560, w:78, h:72, anchor:{ax:.5,ay:.7}, src:"assets/beetle.png", intro:"pop", delay:2260, idle:"bob", idleDur:3.8, idleDelay:1.4 },
+  { id:"frog", type:"frog", layer:6, x:830, y:512, w:104, h:96, anchor:{ax:.5,ay:.82}, src:"assets/frog.png", intro:"pop", delay:2440, idle:"breathe", idleDur:4.4, idleDelay:.2 },
 
   { id:"leaf", type:"leaf", layer:7, x:648, y:430, w:440, h:210, anchor:{ax:.5,ay:.5}, src:"assets/leaf.png", intro:"leaf", delay:3000, idle:"sway", idleDur:7.5, idleDelay:.2 },
 
   /* THE HERO — crawls the leaf (id "protagonist" so the crawl finds it),
      then is grabbed. Path ENDS at HERO_REST. */
   { id:"protagonist", type:"snail", layer:8, x:0, y:0, w:158, h:140, anchor:{ax:.5,ay:.82},
-    src:HERO_SRC, intro:"fade", delay:4700, idle:"breathe", idleDur:2.6, idleDelay:0,
+    src:HERO_SRC, intro:"fade", delay:4700, idle:"breathePulse", idleDur:4.2, idleDelay:0,
     opts:{...SHELL.amber, hero:true},
     path:"M 500 452 C 560 436, 640 420, 700 408" },
 
@@ -342,15 +506,15 @@ const ASSETS_B = [
   { id:"fern-2", type:"fern", layer:4, x:470, y:588, w:110, h:140, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1680, idle:"sway", idleDur:6.4, idleDelay:1.1, opts:{tone:"mid"} },
   { id:"fern-3", type:"fern", layer:4, x:884, y:572, w:140, h:172, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1820, idle:"sway", idleDur:7.5, idleDelay:.6, opts:{tone:"near", flip:true} },
 
-  { id:"slug-jade", type:"slug", layer:5, x:440, y:548, w:140, h:96, anchor:{ax:.5,ay:.86}, src:null, intro:"pop", delay:2000, idle:"breathe", idleDur:5.2, idleDelay:.3, opts:SLUG.jade },
-  { id:"slug-violet", type:"slug", layer:5, x:786, y:560, w:130, h:90, anchor:{ax:.5,ay:.86}, src:null, intro:"pop", delay:2200, idle:"sway", idleDur:6, idleDelay:1.2, opts:{...SLUG.violet, flip:true} },
-  { id:"slug-pale", type:"slug", layer:5, x:602, y:540, w:110, h:78, anchor:{ax:.5,ay:.86}, src:null, intro:"pop", delay:2380, idle:"breathe", idleDur:5.8, idleDelay:.8, opts:SLUG.pale },
-  { id:"slug-jade-2", type:"slug", layer:5, x:694, y:520, w:92, h:66, anchor:{ax:.5,ay:.86}, src:null, intro:"pop", delay:2520, idle:"sway", idleDur:6.4, idleDelay:1.9, opts:{...SLUG.jade, flip:true} },
+  { id:"slug-jade", type:"slug", layer:5, x:440, y:548, w:140, h:96, anchor:{ax:.5,ay:.86}, src:"assets/slug-jade.png", intro:"pop", delay:2000, idle:"breathe", idleDur:5.2, idleDelay:.3, opts:SLUG.jade },
+  { id:"slug-violet", type:"slug", layer:5, x:786, y:560, w:130, h:90, anchor:{ax:.5,ay:.86}, src:"assets/slug-violet.png", intro:"pop", delay:2200, idle:"sway", idleDur:6, idleDelay:1.2, opts:{...SLUG.violet, flip:true} },
+  { id:"slug-pale", type:"slug", layer:5, x:602, y:540, w:110, h:78, anchor:{ax:.5,ay:.86}, src:"assets/slug-pale.png", intro:"pop", delay:2380, idle:"breathe", idleDur:5.8, idleDelay:.8, opts:SLUG.pale },
+  { id:"slug-jade-2", type:"slug", layer:5, x:694, y:520, w:92, h:66, anchor:{ax:.5,ay:.86}, src:"assets/slug-jade.png", intro:"pop", delay:2520, idle:"sway", idleDur:6.4, idleDelay:1.9, opts:{...SLUG.jade, flip:true} },
 
   { id:"leaf", type:"foreignLeaf", layer:6, x:648, y:444, w:430, h:210, anchor:{ax:.5,ay:.5}, src:null, intro:"leaf", delay:3000, idle:"sway", idleDur:7.5, idleDelay:.2 },
 
   { id:"protagonist", type:"snail", layer:7, x:0, y:0, w:158, h:140, anchor:{ax:.5,ay:.82},
-    src:HERO_SRC, intro:"fade", delay:4700, idle:"breathe", idleDur:2.6, idleDelay:0, opts:{...SHELL.amber, hero:true},
+    src:HERO_SRC, intro:"fade", delay:4700, idle:"breathePulse", idleDur:4.2, idleDelay:0, opts:{...SHELL.amber, hero:true},
     path:"M 500 470 C 585 450, 665 434, 735 420 C 786 410, 820 407, 848 408" },
 
   { id:"frond-fg-l", type:"fern", layer:8, x:210, y:700, w:300, h:340, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1300, idle:"sway", idleDur:9, idleDelay:.5, opts:{tone:"far"} },
@@ -440,7 +604,8 @@ function renderAsset(a){
 
 function renderArtBody(a){
   if(a.src){
-    return `<image href="${a.src}" x="-50" y="-50" width="100" height="100" preserveAspectRatio="xMidYMid meet"/>`;
+    const f = a.opts?.flip ? ' transform="scale(-1,1)"' : '';
+    return `<g${f}><image href="${a.src}" x="-50" y="-50" width="100" height="100" preserveAspectRatio="xMidYMid meet"/></g>`;
   }
   const draw = DRAW[a.type];
   return draw ? draw(a.opts||{}) : `<rect x="-50" y="-50" width="100" height="100" fill="#ccc"/>`;
@@ -549,8 +714,13 @@ function placeHeroAt(progress){
   const { path } = hero;
   const dd  = clamp(progress*path.len, 0, path.len);
   const pt  = path.node.getPointAtLength(dd);
-  const pt2 = path.node.getPointAtLength(Math.min(path.len, dd + 1.5));
-  let ang = Math.atan2(pt2.y-pt.y, pt2.x-pt.x) * 180/Math.PI;
+  const d0  = Math.max(0, dd - 6);
+  const d1  = Math.min(path.len, dd + 6);
+  const ptA = path.node.getPointAtLength(d0);
+  const ptB = path.node.getPointAtLength(d1);
+  let ang = (d1 > d0)
+    ? Math.atan2(ptB.y - ptA.y, ptB.x - ptA.x) * 180/Math.PI
+    : 0;
   ang = Math.max(-16, Math.min(16, ang));
   hero.pos.setAttribute("transform", `translate(${pt.x},${pt.y}) rotate(${ang})`);
 }
@@ -767,6 +937,7 @@ document.getElementById("replay").addEventListener("click", play);
 
 /* ---- parallax pointer hook (subtle; expand later for depth) ---- */
 window.addEventListener("pointermove", (e)=>{
+  if(STAGING) return;
   const nx = (e.clientX/window.innerWidth  - .5)*2;
   const ny = (e.clientY/window.innerHeight - .5)*2;
   const keys = Object.keys(layerGroups).map(Number).sort((a,b)=>a-b);
@@ -922,10 +1093,9 @@ const DRAW = {
       : `<circle cx="-8" cy="45" r="6"/><circle cx="8" cy="45" r="6"/><circle cx="0" cy="47" r="6"/>`;
     return `
       <g fill="none" stroke="var(--talon)" stroke-width="13" stroke-linecap="round">
-        <path d="M0 -220 L0 -8"/>
+        <path d="M0 -800 L0 -8"/>
         ${toes}
       </g>
-      <ellipse cx="0" cy="-150" rx="9" ry="14" fill="var(--talon-dk)" opacity=".22"/>
       <circle cx="0" cy="-8" r="10" fill="var(--talon)"/>
       <g fill="var(--talon-dk)">${claws}</g>`;
   },
@@ -1038,7 +1208,454 @@ const DRAW = {
     </g>`,
 };
 
+/* ================================================================
+   STAGING / ASSET EDITOR
+   ================================================================ */
+let STAGING = false;
+let _stagePhase = "HOME";
+let _selId = null;
+let _drag  = null;
+let _nudgeTimer = null;
+
+/* Snapshots taken BEFORE overrides load — always reflect hardcoded defaults */
+const _snapshots = {
+  HOME:    ASSETS_HOME.map(a=>({...a, opts: a.opts ? {...a.opts} : null})),
+  CARRY:   ASSETS_CARRY.map(a=>({...a, opts: a.opts ? {...a.opts} : null})),
+  ARRIVAL: ASSETS_B.map(a=>({...a, opts: a.opts ? {...a.opts} : null})),
+};
+/* Original HERO_REST so reset can restore it */
+const _origHeroRest = [...HERO_REST];
+
+/* "end" = protagonist at rest/grab position; "start" = crawl start */
+let _pathMode = "end";
+
+/* Shift all coordinate pairs in an SVG path string by (dx, dy).
+   Works for M/C/L paths where every number is an x or y coord alternating. */
+function _shiftPath(pathStr, dx, dy){
+  let i = 0;
+  return pathStr.replace(/-?[\d.]+(?:\.\d+)?/g, n => {
+    const v = parseFloat(n) + (i++ % 2 === 0 ? dx : dy);
+    return String(Math.round(v));
+  });
+}
+
+/* Shift only the M x y start point of an SVG path (keeps end point fixed) */
+function _shiftPathStart(pathStr, dx, dy){
+  let i = 0;
+  return pathStr.replace(/-?[\d.]+(?:\.\d+)?/g, n => {
+    const idx = i++;
+    if(idx === 0) return String(Math.round(parseFloat(n) + dx));
+    if(idx === 1) return String(Math.round(parseFloat(n) + dy));
+    return n;
+  });
+}
+
+/* pos-group transform string including rotation */
+function _posXform(a){ return `translate(${a.x},${a.y}) rotate(${a.rot||0})`; }
+
+/* ---- persistence ---- */
+const _LS = "snail-story-overrides";
+
+function _loadOverrides(){
+  try {
+    const raw = localStorage.getItem(_LS); if(!raw) return;
+    const data = JSON.parse(raw);
+    const map = {HOME:ASSETS_HOME, CARRY:ASSETS_CARRY, ARRIVAL:ASSETS_B};
+    for(const [p, assets] of Object.entries(map)){
+      for(const a of assets){
+        const ov = (data[p]||{})[a.id]; if(!ov) continue;
+        if(ov.x    !== undefined) a.x   = ov.x;
+        if(ov.y    !== undefined) a.y   = ov.y;
+        if(ov.w    !== undefined) a.w   = ov.w;
+        if(ov.h    !== undefined) a.h   = ov.h;
+        if(ov.rot  !== undefined) a.rot = ov.rot;
+        if(ov.path !== undefined) a.path = ov.path;
+        if(ov.flip !== undefined) a.opts = {...(a.opts||{}), flip:ov.flip};
+      }
+    }
+    /* Sync HERO_REST to whatever the HOME protagonist path now ends at */
+    const protagHome = ASSETS_HOME.find(a=>a.id==="protagonist");
+    if(protagHome?.path){
+      const tmp = document.createElementNS(SVGNS,"path");
+      tmp.setAttribute("d", protagHome.path);
+      const pt = tmp.getPointAtLength(tmp.getTotalLength());
+      HERO_REST[0] = Math.round(pt.x); HERO_REST[1] = Math.round(pt.y);
+    }
+  } catch(e){}
+}
+
+function _buildOverrideData(){
+  const map = {HOME:[ASSETS_HOME,_snapshots.HOME],CARRY:[ASSETS_CARRY,_snapshots.CARRY],ARRIVAL:[ASSETS_B,_snapshots.ARRIVAL]};
+  const data = {HOME:{},CARRY:{},ARRIVAL:{}};
+  for(const [p,[cur,orig]] of Object.entries(map)){
+    for(const a of cur){
+      const o = orig.find(x=>x.id===a.id); if(!o) continue;
+      const entry = {};
+      if(a.x    !== o.x)                          entry.x    = a.x;
+      if(a.y    !== o.y)                          entry.y    = a.y;
+      if(a.w    !== o.w)                          entry.w    = a.w;
+      if(a.h    !== o.h)                          entry.h    = a.h;
+      if((a.rot||0) !== (o.rot||0))               entry.rot  = a.rot||0;
+      if(a.path !== o.path)                       entry.path = a.path;
+      if(!!(a.opts?.flip) !== !!(o.opts?.flip))   entry.flip = !!a.opts?.flip;
+      if(Object.keys(entry).length) data[p][a.id] = entry;
+    }
+  }
+  return data;
+}
+
+function _saveOverrides(){
+  localStorage.setItem(_LS, JSON.stringify(_buildOverrideData()));
+  _showStatus("saved");
+}
+
+let _statusTimer = null;
+function _showStatus(msg){
+  const el = document.getElementById("saveStatus"); if(!el) return;
+  el.textContent = msg;
+  clearTimeout(_statusTimer);
+  _statusTimer = setTimeout(()=>{ if(el) el.textContent=""; }, 2000);
+}
+
+function _exportJSON(){
+  const json = JSON.stringify(_buildOverrideData(), null, 2);
+  const a = document.createElement("a");
+  a.href = "data:application/json;charset=utf-8," + encodeURIComponent(json);
+  a.download = "scene-overrides.json";
+  a.click();
+}
+
+function _importJSON(input){
+  const file = input.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      localStorage.setItem(_LS, JSON.stringify(data));
+      _applySnapshot();
+      _loadOverrides();
+      if(STAGING) buildStagingPhase(_stagePhase);
+      _showStatus("imported");
+    } catch(err){ _showStatus("bad file"); }
+    input.value = "";
+  };
+  reader.readAsText(file);
+}
+
+function _applySnapshot(){
+  const map = {HOME:[ASSETS_HOME,_snapshots.HOME],CARRY:[ASSETS_CARRY,_snapshots.CARRY],ARRIVAL:[ASSETS_B,_snapshots.ARRIVAL]};
+  for(const [,[cur,orig]] of Object.entries(map)){
+    for(const a of cur){
+      const o = orig.find(x=>x.id===a.id); if(!o) continue;
+      a.x=o.x; a.y=o.y; a.w=o.w; a.h=o.h; a.rot=o.rot||0;
+      a.opts = o.opts ? {...o.opts} : null;
+      if(o.path !== undefined) a.path = o.path;
+    }
+  }
+  HERO_REST[0] = _origHeroRest[0]; HERO_REST[1] = _origHeroRest[1];
+}
+
+function _clearOverrides(){
+  if(!confirm("Reset all assets to their default positions?")) return;
+  localStorage.removeItem(_LS);
+  _applySnapshot();
+  if(STAGING) buildStagingPhase(_stagePhase);
+  _showStatus("reset");
+}
+
+function _assets(p){ return p==="HOME"?ASSETS_HOME:p==="CARRY"?ASSETS_CARRY:ASSETS_B; }
+function _find(p,id){ return _assets(p).find(a=>a.id===id); }
+
+/* ---- toggle ---- */
+function toggleStaging(){ STAGING ? _exitStage() : _enterStage(); }
+
+function _enterStage(){
+  STAGING = true;
+  if(rafId){ cancelAnimationFrame(rafId); rafId=null; }
+  Object.values(layerGroups).forEach(g=>{ g.style.transform=""; g.style.transition="none"; });
+  document.getElementById("stageToggle").classList.add("active");
+  document.getElementById("stageToggle").textContent = "✕ exit edit";
+  document.getElementById("replay").style.display = "none";
+  document.getElementById("stageModeUI").classList.add("visible");
+  buildStagingPhase(_stagePhase);
+}
+
+function _exitStage(){
+  STAGING = false;
+  _selId = null; _drag = null;
+  document.getElementById("stageToggle").classList.remove("active");
+  document.getElementById("stageToggle").textContent = "edit";
+  document.getElementById("replay").style.display = "flex";
+  document.getElementById("stageModeUI").classList.remove("visible");
+  play();
+}
+
+/* ---- static scene build ---- */
+function buildStagingPhase(p){
+  _stagePhase = p;
+  _selId = null; _drag = null; hero = null;
+  if(p==="ARRIVAL") stage.classList.add("cool"); else stage.classList.remove("cool");
+  fadeEl.style.opacity = 0; captionEl.style.opacity = 0;
+
+  const assets = _assets(p);
+  scene.innerHTML = "";
+  layerGroups={}; nodeById={}; hero=null;
+  scene.appendChild(buildDefs());
+  const lvs = [...new Set(assets.map(a=>a.layer))].sort((a,b)=>a-b);
+  for(const L of lvs){
+    const g=el("g",{class:"layer","data-layer":L});
+    layerGroups[L]=g; scene.appendChild(g);
+  }
+  for(const a of assets){
+    const node = _renderStatic(a);
+    layerGroups[a.layer].appendChild(node);
+    nodeById[a.id] = node;
+    if(a.id==="protagonist" && a.path){
+      hero = { pos:node, asset:a, path:samplePath(a.path) };
+      _placeHeroStage();
+    }
+  }
+  const ov = el("g",{id:"stageOv"});
+  scene.appendChild(ov);
+  _updateTabs();
+  _updateInsp(null);
+}
+
+function _renderStatic(a){
+  const pos = el("g",{class:"pos", transform:_posXform(a)});
+  pos.dataset.id = a.id;
+  pos.style.cursor = "move";
+  const art = el("g",{class:"art", transform:_artXform(a)});
+  art.innerHTML = renderArtBody(a);
+  pos.appendChild(art);
+  return pos;
+}
+
+function _artXform(a){
+  const ax=a.anchor?.ax??.5, ay=a.anchor?.ay??.5;
+  return `translate(${(.5-ax)*a.w},${(.5-ay)*a.h}) scale(${a.w/ART},${a.h/ART})`;
+}
+
+/* ---- pointer events ---- */
+scene.addEventListener("pointerdown", e=>{
+  if(!STAGING) return;
+  e.preventDefault(); e.stopPropagation();
+  const posG = e.target.closest ? e.target.closest("[data-id]") : null;
+  if(!posG){ _selId=null; _updateOv(); _updateInsp(null); return; }
+  const id = posG.dataset.id;
+  _selId = id; _updateOv(); _updateInsp(id);
+  const sv = _toSVG(e.clientX, e.clientY);
+  const a  = _find(_stagePhase, id); if(!a) return;
+  const isPath = !!(a.path && hero?.asset === a);
+  let ox = a.x, oy = a.y;
+  if(isPath){
+    const t = _pathMode === "end" ? 1 : 0;
+    const vp = hero.path.node.getPointAtLength(t * hero.path.len);
+    ox = vp.x; oy = vp.y;
+  }
+  _drag = {
+    id, asset:a, node:posG, isPath,
+    sx:sv.x, sy:sv.y, ox, oy,
+    origPath:     a.path ? a.path : null,
+    origHeroRest: isPath && _stagePhase==="HOME" ? [...HERO_REST] : null,
+  };
+  scene.setPointerCapture(e.pointerId);
+});
+
+scene.addEventListener("pointermove", e=>{
+  if(!STAGING || !_drag) return;
+  e.preventDefault();
+  const sv = _toSVG(e.clientX, e.clientY);
+  if(_drag.isPath){
+    const tdx = Math.round(sv.x - _drag.sx);
+    const tdy = Math.round(sv.y - _drag.sy);
+    if(_pathMode === "end"){
+      _drag.asset.path = _shiftPath(_drag.origPath, tdx, tdy);
+      if(_drag.origHeroRest){
+        HERO_REST[0] = _drag.origHeroRest[0] + tdx;
+        HERO_REST[1] = _drag.origHeroRest[1] + tdy;
+      }
+    } else {
+      _drag.asset.path = _shiftPathStart(_drag.origPath, tdx, tdy);
+    }
+    hero.path.node.setAttribute("d", _drag.asset.path);
+    hero.path.len = hero.path.node.getTotalLength();
+    placeHeroAt(_pathMode === "end" ? 1 : 0);
+  } else {
+    const newX = Math.round(_drag.ox + (sv.x - _drag.sx));
+    const newY = Math.round(_drag.oy + (sv.y - _drag.sy));
+    _drag.asset.x = newX; _drag.asset.y = newY;
+    _drag.node.setAttribute("transform", _posXform(_drag.asset));
+  }
+  _updateOv(); _updateInsp(_drag.id);
+});
+
+scene.addEventListener("pointerup", e=>{
+  if(!STAGING) return;
+  if(_drag) _saveOverrides();
+  _drag = null;
+  scene.releasePointerCapture(e.pointerId);
+});
+
+document.addEventListener("keydown", e=>{
+  if(!STAGING || !_selId) return;
+  if(!["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)) return;
+  e.preventDefault();
+  const step = e.shiftKey ? 10 : 1;
+  nudge(
+    e.key==="ArrowLeft" ? -step : e.key==="ArrowRight" ? step : 0,
+    e.key==="ArrowUp"   ? -step : e.key==="ArrowDown"  ? step : 0
+  );
+});
+
+function _toSVG(cx, cy){
+  const r = scene.getBoundingClientRect();
+  return { x: 200 + (cx-r.left)*800/r.width, y: (cy-r.top)*800/r.height };
+}
+
+/* ---- selection overlay ---- */
+function _updateOv(){
+  const ov = document.getElementById("stageOv"); if(!ov) return;
+  ov.innerHTML = "";
+  if(!_selId) return;
+  const a = _find(_stagePhase, _selId); if(!a) return;
+  let vx = a.x, vy = a.y;
+  if(a.path && hero?.asset === a){
+    const t = _pathMode === "end" ? 1 : 0;
+    const vp = hero.path.node.getPointAtLength(t * hero.path.len);
+    vx = vp.x; vy = vp.y;
+  }
+  const ax=a.anchor?.ax??.5, ay=a.anchor?.ay??.5;
+  const x1=vx-ax*a.w, y1=vy-ay*a.h;
+  const rot = a.rot||0;
+  ov.innerHTML = `
+    <g ${rot ? `transform="rotate(${rot},${vx},${vy})"` : ""}>
+      <rect x="${x1}" y="${y1}" width="${a.w}" height="${a.h}"
+            fill="none" stroke="#00D4FF" stroke-width="1.5" stroke-dasharray="5 3"
+            pointer-events="none"/>
+      <circle cx="${x1}"     cy="${y1}"     r="5" fill="#00D4FF" stroke="#fff" stroke-width="1.5" pointer-events="none"/>
+      <circle cx="${x1+a.w}" cy="${y1}"     r="5" fill="#00D4FF" stroke="#fff" stroke-width="1.5" pointer-events="none"/>
+      <circle cx="${x1}"     cy="${y1+a.h}" r="5" fill="#00D4FF" stroke="#fff" stroke-width="1.5" pointer-events="none"/>
+      <circle cx="${x1+a.w}" cy="${y1+a.h}" r="5" fill="#00D4FF" stroke="#fff" stroke-width="1.5" pointer-events="none"/>
+    </g>
+    <circle cx="${vx}" cy="${vy}" r="3" fill="#FF6B6B" pointer-events="none"/>`;
+}
+
+/* ---- inspector ---- */
+function _updateInsp(id){
+  const empty = document.getElementById("inspEmpty");
+  const content = document.getElementById("inspContent");
+  if(!id){ empty.style.display=""; content.style.display="none"; return; }
+  const a = _find(_stagePhase, id); if(!a) return;
+  empty.style.display = "none"; content.style.display = "";
+  document.getElementById("assetLabel").textContent = a.id;
+  let dispX = a.x, dispY = a.y;
+  if(a.path && hero?.asset === a){
+    const t = _pathMode === "end" ? 1 : 0;
+    const vp = hero.path.node.getPointAtLength(t * hero.path.len);
+    dispX = Math.round(vp.x); dispY = Math.round(vp.y);
+  }
+  document.getElementById("iX").textContent = dispX;
+  document.getElementById("iY").textContent = dispY;
+  document.getElementById("iW").textContent = a.w;
+  document.getElementById("iH").textContent = a.h;
+  document.getElementById("iRot").textContent = (a.rot||0) + "°";
+  const flipped = !!(a.opts?.flip);
+  const fb = document.getElementById("flipBtn");
+  fb.textContent = flipped ? "flip ⟺  ON" : "flip ⟺  off";
+  fb.classList.toggle("hi", flipped);
+}
+
+function _updateTabs(){
+  document.querySelectorAll(".phaseTab").forEach(t=>{
+    t.classList.toggle("active", t.dataset.phase===_stagePhase);
+  });
+}
+
+/* ---- controls ---- */
+function scaleAsset(factor){
+  if(!_selId) return;
+  const a = _find(_stagePhase, _selId); if(!a) return;
+  a.w = Math.round(a.w * factor); a.h = Math.round(a.h * factor);
+  const node = nodeById[_selId]; if(!node) return;
+  const art = node.querySelector(".art");
+  if(art) art.setAttribute("transform", _artXform(a));
+  _updateOv(); _updateInsp(_selId); _saveOverrides();
+}
+
+function nudge(dx, dy){
+  if(!_selId) return;
+  const a = _find(_stagePhase, _selId); if(!a) return;
+  if(a.path && hero?.asset === a){
+    if(_pathMode === "end"){
+      a.path = _shiftPath(a.path, dx, dy);
+      if(_stagePhase==="HOME"){ HERO_REST[0]+=dx; HERO_REST[1]+=dy; }
+    } else {
+      a.path = _shiftPathStart(a.path, dx, dy);
+    }
+    hero.path.node.setAttribute("d", a.path);
+    hero.path.len = hero.path.node.getTotalLength();
+    placeHeroAt(_pathMode === "end" ? 1 : 0);
+  } else {
+    a.x += dx; a.y += dy;
+    const node = nodeById[_selId];
+    if(node) node.setAttribute("transform", _posXform(a));
+  }
+  _updateOv(); _updateInsp(_selId);
+  clearTimeout(_nudgeTimer);
+  _nudgeTimer = setTimeout(_saveOverrides, 400);
+}
+
+function rotateAsset(deg){
+  if(!_selId) return;
+  const a = _find(_stagePhase, _selId); if(!a) return;
+  a.rot = ((a.rot||0) + deg % 360 + 360) % 360;
+  if(a.path && hero?.asset === a){ _placeHeroStage(); }
+  else { const node = nodeById[_selId]; if(node) node.setAttribute("transform", _posXform(a)); }
+  _updateOv(); _updateInsp(_selId); _saveOverrides();
+}
+
+function resetRot(){
+  if(!_selId) return;
+  const a = _find(_stagePhase, _selId); if(!a) return;
+  a.rot = 0;
+  if(a.path && hero?.asset === a){ _placeHeroStage(); }
+  else { const node = nodeById[_selId]; if(node) node.setAttribute("transform", _posXform(a)); }
+  _updateOv(); _updateInsp(_selId); _saveOverrides();
+}
+
+/* Staging-only: position the protagonist at its path visual point + user rotation.
+   placeHeroAt() uses the path tangent for the film; staging uses a.rot instead. */
+function _placeHeroStage(){
+  if(!hero) return;
+  const t = _pathMode === "end" ? 1 : 0;
+  const vp = hero.path.node.getPointAtLength(t * hero.path.len);
+  hero.pos.setAttribute("transform", `translate(${vp.x},${vp.y}) rotate(${hero.asset.rot||0})`);
+}
+
+function setPathMode(mode){
+  _pathMode = mode;
+  document.getElementById("pmEnd")?.classList.toggle("hi", mode==="end");
+  document.getElementById("pmStart")?.classList.toggle("hi", mode==="start");
+  if(hero){
+    hero.path.len = hero.path.node.getTotalLength();
+    _placeHeroStage();
+  }
+  _updateOv(); _updateInsp(_selId);
+}
+
+function toggleFlip(){
+  if(!_selId) return;
+  const a = _find(_stagePhase, _selId); if(!a) return;
+  a.opts = { ...(a.opts||{}), flip:!(a.opts?.flip) };
+  const node = nodeById[_selId]; if(!node) return;
+  const art = node.querySelector(".art");
+  if(art) art.innerHTML = renderArtBody(a);
+  _updateInsp(_selId); _saveOverrides();
+}
+
 /* ----------------- GO ----------------- */
+_loadOverrides();
 play();
 </script>
 </body>
