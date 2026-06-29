@@ -159,6 +159,8 @@
   @keyframes bob{ 0%,100%{transform:translateY(0);} 50%{transform:translateY(-3px);} }
   @keyframes sway{ 0%,100%{transform:rotate(-1.4deg);} 50%{transform:rotate(1.4deg);} }
   @keyframes flap{ 0%,100%{transform:scaleY(1);} 50%{transform:scaleY(.6);} }
+  @keyframes slugStretch{ 0%,100%{transform:scaleX(1) scaleY(1);} 40%{transform:scaleX(1.16) scaleY(0.86);} 72%{transform:scaleX(0.90) scaleY(1.13);} }
+  @keyframes blink{ 0%,86%,100%{opacity:1;} 90%{opacity:0;} 96%{opacity:1;} }
   /* leaves/particles thrown from the canopy as the hero falls in */
   @keyframes burst{
     from{transform:translate(0,0) rotate(0);opacity:1;}
@@ -384,8 +386,8 @@
    ★★★  SWAPPING A PLACEHOLDER FOR A PNG (unchanged from Beat 1)  ★★★
    Set  src: "assets/whatever.png"  on any entry. null -> DRAW[type](),
    a string -> <image> at the same x/y/w/h/anchor (transparent PNGs).
-   The hero points at HERO_SRC in ALL THREE phases, so it stays visually
-   identical everywhere. Swappable types: sky, sun, foliage, ground,
+   HOME + CARRY use HERO_SRC; ARRIVAL uses HERO_SRC_B — swap each independently.
+   Swappable types: sky, sun, foliage, ground,
    rock, leaf, mushroom, grass, snail, ladybug, beetle, frog, bird,
    talons, airsky, cloud, treetop, coolSky, lightShafts, coolGround,
    log, fern, frond, glowMushroom, slug, foreignLeaf.
@@ -394,7 +396,8 @@
 
 const SVGNS = "http://www.w3.org/2000/svg";
 const ART = 100;                       // placeholders drawn in a 100x100 box centered on (0,0)
-const HERO_SRC = "assets/snail.png";   // shared so the hero is identical across all phases
+const HERO_SRC   = "assets/snail.png";    // hero in HOME + CARRY
+const HERO_SRC_B = "assets/snail-b.png"; // hero after arrival — swap in the new asset here
 const CAPTION_B = "";                   // captions removed (was "elsewhere")
 
 /* color sets */
@@ -492,6 +495,8 @@ const ASSETS_CARRY = [
 const ASSETS_B = [
   { id:"coolsky", type:"coolSky", layer:0, x:600, y:400, w:1500, h:1100, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:0 },
 
+  { id:"eyes", type:"eyeField", layer:1, x:600, y:350, w:1200, h:700, anchor:{ax:.5,ay:.5}, src:null, intro:"none" },
+
   { id:"frond-far-l", type:"frond", layer:1, x:200, y:250, w:540, h:600, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:200, idle:"sway", idleDur:12, idleDelay:0, opts:{tone:"far"} },
   { id:"frond-far-r", type:"frond", layer:1, x:1010, y:220, w:560, h:620, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:260, idle:"sway", idleDur:14, idleDelay:2, opts:{tone:"far", flip:true} },
   { id:"shafts", type:"lightShafts", layer:1, x:560, y:280, w:1100, h:1000, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:120 },
@@ -514,7 +519,7 @@ const ASSETS_B = [
   { id:"leaf", type:"foreignLeaf", layer:6, x:648, y:444, w:430, h:210, anchor:{ax:.5,ay:.5}, src:null, intro:"leaf", delay:3000, idle:"sway", idleDur:7.5, idleDelay:.2 },
 
   { id:"protagonist", type:"snail", layer:7, x:0, y:0, w:158, h:140, anchor:{ax:.5,ay:.82},
-    src:HERO_SRC, intro:"fade", delay:4700, idle:"breathePulse", idleDur:4.2, idleDelay:0, opts:{...SHELL.amber, hero:true},
+    src:HERO_SRC_B, intro:"fade", delay:4700, idle:"breathePulse", idleDur:4.2, idleDelay:0, opts:{...SHELL.amber, hero:true},
     path:"M 500 470 C 585 450, 665 434, 735 420 C 786 410, 820 407, 848 408" },
 
   { id:"frond-fg-l", type:"fern", layer:8, x:210, y:700, w:300, h:340, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1300, idle:"sway", idleDur:9, idleDelay:.5, opts:{tone:"far"} },
@@ -1206,6 +1211,33 @@ const DRAW = {
       <path d="M-12 3 Q-6 -12 4 -16"/><path d="M6 2 Q14 -8 26 -10"/><path d="M22 1 Q30 -4 38 -4"/>
       <path d="M-10 4 Q-6 16 2 22"/><path d="M10 3 Q16 14 24 18"/>
     </g>`,
+
+  eyeField: ()=>{
+    /* [art_x, art_y, size, blinkDur, blinkDelay, color]
+       asset: x:600 y:350 w:1200 h:700 → sx=12 sy=7
+       scene_y = 350 + art_y*7  — negative=high, positive=lower into the forest
+       6 pairs spread top-to-bottom so they don't cluster */
+    const E = [
+      [-26, -38, 1.3, 4.4, 0.0, "#D4AE44"],   // scene y≈84  — high left
+      [ 20, -42, 1.1, 6.1, 2.3, "#80C270"],    // scene y≈56  — high right
+      [-30, -20, 1.4, 3.8, 1.5, "#D4AE44"],    // scene y≈210 — mid left
+      [ 26, -24, 1.2, 5.6, 0.8, "#80C270"],    // scene y≈182 — mid right
+      [-12,   6, 1.5, 4.9, 3.2, "#D4AE44"],    // scene y≈392 — low left
+      [ 16,  10, 1.1, 6.5, 1.0, "#80C270"],    // scene y≈420 — low right
+    ];
+    return E.map(([ax, ay, s, dur, delay, col])=>{
+      const g = s * 3.2;
+      return `
+      <g transform="translate(${ax},${ay})">
+        <ellipse cx="${-g/2}" cy="0" rx="${s*2.0}" ry="${s*1.6}" fill="${col}" opacity=".06"/>
+        <ellipse cx="${ g/2}" cy="0" rx="${s*2.0}" ry="${s*1.6}" fill="${col}" opacity=".06"/>
+        <g style="animation:blink ${dur}s ease-in-out ${delay}s infinite">
+          <ellipse cx="${-g/2}" cy="0" rx="${s*1.2}" ry="${s*0.8}" fill="${col}" opacity=".58"/>
+          <ellipse cx="${ g/2}" cy="0" rx="${s*1.2}" ry="${s*0.8}" fill="${col}" opacity=".58"/>
+        </g>
+      </g>`;
+    }).join('');
+  },
 };
 
 /* ================================================================
