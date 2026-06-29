@@ -417,12 +417,12 @@ const SLUG = {
 /* The hero's resting spot at the END of the home crawl (= the home
    path's endpoint). The talons descend here to grab him. Keep these in
    sync with the protagonist `path` below. */
-const HERO_REST = [700, 408];
+const HERO_REST = [698, 640];
 
 /* =======================  HOME  (Beat 1 + bird + talons)  ======== */
 const ASSETS_HOME = [
   { id:"sky", type:"sky", layer:0, x:600, y:400, w:1500, h:1100, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:0 },
-  { id:"sun", type:"sun", layer:0, x:360, y:210, w:760, h:760, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:120 },
+  { id:"sun", type:"sun", layer:0, x:361, y:210, w:760, h:760, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:120 },
 
   /* the distant bird (flies right->left during its window; rAF-driven) */
   { id:"bird", type:"bird", layer:3, x:1320, y:155, w:110, h:74, anchor:{ax:.5,ay:.5},
@@ -430,13 +430,13 @@ const ASSETS_HOME = [
 
   /* far/mid foliage lowered into a tree-line behind the clearing, leaving an
      open sky band up top (~y 0..270) for the bird to cross. */
-  { id:"foliage-far-l", type:"foliage", layer:1, x:250, y:480, w:640, h:380, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:160, idle:"sway", idleDur:11, idleDelay:0, opts:{tone:"far"} },
+  { id:"foliage-far-l", type:"foliage", layer:1, x:250, y:479, w:640, h:380, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:160, idle:"sway", idleDur:11, idleDelay:0, opts:{tone:"far"} },
   { id:"foliage-far-r", type:"foliage", layer:1, x:980, y:460, w:680, h:400, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:220, idle:"sway", idleDur:13, idleDelay:2, opts:{tone:"far"} },
   { id:"foliage-mid-l", type:"foliage", layer:2, x:150, y:560, w:560, h:380, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:240, idle:"sway", idleDur:9, idleDelay:1, opts:{tone:"mid"} },
   { id:"foliage-mid-r", type:"foliage", layer:2, x:1060, y:575, w:580, h:380, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:300, idle:"sway", idleDur:10, idleDelay:3, opts:{tone:"mid"} },
 
   { id:"ground", type:"ground", layer:3, x:600, y:660, w:1500, h:520, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:120 },
-  { id:"rock", type:"rock", layer:4, x:600, y:600, w:820, h:420, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:260 },
+  { id:"rock", type:"rock", layer:4, x:587, y:618, w:820, h:420, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:260 },
 
   { id:"mushroom-1", type:"mushroom", layer:5, x:352, y:512, w:120, h:130, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1500, idle:"breathe", idleDur:6, idleDelay:.4, opts:{cap:"#E27A5E"} },
   { id:"mushroom-2", type:"mushroom", layer:5, x:430, y:548, w:84, h:92, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1680, idle:"breathe", idleDur:5.4, idleDelay:1.1, opts:{cap:"#E8A24A"} },
@@ -444,22 +444,22 @@ const ASSETS_HOME = [
   { id:"grass-1", type:"grass", layer:5, x:300, y:560, w:150, h:120, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1400, idle:"sway", idleDur:7, idleDelay:0 },
   { id:"grass-2", type:"grass", layer:5, x:910, y:580, w:160, h:130, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1560, idle:"sway", idleDur:8, idleDelay:1.5 },
 
-  { id:"snail-coral", type:"snail", layer:6, x:430, y:506, w:128, h:112, anchor:{ax:.5,ay:.86}, src:"assets/snail-coral.png", intro:"pop", delay:2000, idle:"breathe", idleDur:5, idleDelay:.3, opts:SHELL.coral },
-  { id:"snail-gold", type:"snail", layer:6, x:792, y:530, w:118, h:104, anchor:{ax:.5,ay:.86}, src:"assets/snail-gold.png", intro:"pop", delay:2200, idle:"breathe", idleDur:5.6, idleDelay:1.2, opts:{...SHELL.gold, flip:true} },
-  { id:"snail-sage", type:"snail", layer:6, x:548, y:486, w:92, h:82, anchor:{ax:.5,ay:.86}, src:"assets/snail-jade.png", intro:"pop", delay:2380, idle:"breathe", idleDur:6, idleDelay:.8, opts:SHELL.sage },
-  { id:"snail-rose", type:"snail", layer:6, x:706, y:478, w:80, h:72, anchor:{ax:.5,ay:.86}, src:"assets/snail-rose.png", intro:"pop", delay:2520, idle:"breathe", idleDur:5.2, idleDelay:1.9, opts:{...SHELL.rose, flip:true} },
-  { id:"ladybug", type:"ladybug", layer:6, x:512, y:548, w:64, h:60, anchor:{ax:.5,ay:.7}, src:"assets/ladybug.png", intro:"pop", delay:2100, idle:"bob", idleDur:3.4, idleDelay:.5 },
-  { id:"beetle", type:"beetle", layer:6, x:636, y:560, w:78, h:72, anchor:{ax:.5,ay:.7}, src:"assets/beetle.png", intro:"pop", delay:2260, idle:"bob", idleDur:3.8, idleDelay:1.4 },
-  { id:"frog", type:"frog", layer:6, x:830, y:512, w:104, h:96, anchor:{ax:.5,ay:.82}, src:"assets/frog.png", intro:"pop", delay:2440, idle:"breathe", idleDur:4.4, idleDelay:.2 },
+  { id:"snail-coral", type:"snail", layer:6, x:303, y:670, w:182, h:160, rot:355, anchor:{ax:.5,ay:.86}, src:"assets/snail-coral.png", intro:"pop", delay:2000, idle:"breathe", idleDur:5, idleDelay:.3, opts:SHELL.coral },
+  { id:"snail-gold", type:"snail", layer:6, x:841, y:632, w:157, h:138, rot:10, anchor:{ax:.5,ay:.86}, src:"assets/snail-gold.png", intro:"pop", delay:2200, idle:"breathe", idleDur:5.6, idleDelay:1.2, opts:{...SHELL.gold, flip:true} },
+  { id:"snail-sage", type:"snail", layer:6, x:566, y:577, w:134, h:120, anchor:{ax:.5,ay:.86}, src:"assets/snail-jade.png", intro:"pop", delay:2380, idle:"breathe", idleDur:6, idleDelay:.8, opts:SHELL.sage },
+  { id:"snail-rose", type:"snail", layer:6, x:462, y:623, w:130, h:117, anchor:{ax:.5,ay:.86}, src:"assets/snail-rose.png", intro:"pop", delay:2520, idle:"breathe", idleDur:5.2, idleDelay:1.9, opts:{...SHELL.rose, flip:true} },
+  { id:"ladybug", type:"ladybug", layer:6, x:449, y:528, w:74, h:68, rot:320, anchor:{ax:.5,ay:.7}, src:"assets/ladybug.png", intro:"pop", delay:2100, idle:"bob", idleDur:3.4, idleDelay:.5 },
+  { id:"beetle", type:"beetle", layer:6, x:321, y:496, w:85, h:77, rot:195, anchor:{ax:.5,ay:.7}, src:"assets/beetle.png", intro:"pop", delay:2260, idle:"bob", idleDur:3.8, idleDelay:1.4 },
+  { id:"frog", type:"frog", layer:6, x:756, y:550, w:167, h:156, rot:5, anchor:{ax:.5,ay:.82}, src:"assets/frog.png", intro:"pop", delay:2440, idle:"breathe", idleDur:4.4, idleDelay:.2 },
 
-  { id:"leaf", type:"leaf", layer:7, x:648, y:430, w:440, h:210, anchor:{ax:.5,ay:.5}, src:"assets/leaf.png", intro:"leaf", delay:3000, idle:"sway", idleDur:7.5, idleDelay:.2 },
+  { id:"leaf", type:"leaf", layer:7, x:597, y:700, w:708, h:338, rot:10, anchor:{ax:.5,ay:.5}, src:"assets/leaf.png", intro:"leaf", delay:3000, idle:"sway", idleDur:7.5, idleDelay:.2 },
 
   /* THE HERO — crawls the leaf (id "protagonist" so the crawl finds it),
      then is grabbed. Path ENDS at HERO_REST. */
-  { id:"protagonist", type:"snail", layer:8, x:0, y:0, w:158, h:140, anchor:{ax:.5,ay:.82},
+  { id:"protagonist", type:"snail", layer:8, x:527, y:710, rot:340, w:158, h:140, anchor:{ax:.5,ay:.82},
     src:HERO_SRC, intro:"fade", delay:4700, idle:"breathePulse", idleDur:4.2, idleDelay:0,
-    opts:{...SHELL.amber, hero:true},
-    path:"M 500 452 C 560 436, 640 420, 700 408" },
+    opts:{...SHELL.amber, hero:true, flip:true},
+    path:"M 541 750 C 558 668, 638 652, 698 640" },
 
   /* the talons — parked above the frame until the snatch; rAF-driven.
      The long leg in DRAW.talons runs off the top so it reads as the
@@ -499,28 +499,28 @@ const ASSETS_B = [
 
   { id:"frond-far-l", type:"frond", layer:1, x:200, y:250, w:540, h:600, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:200, idle:"sway", idleDur:12, idleDelay:0, opts:{tone:"far"} },
   { id:"frond-far-r", type:"frond", layer:1, x:1010, y:220, w:560, h:620, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:260, idle:"sway", idleDur:14, idleDelay:2, opts:{tone:"far", flip:true} },
-  { id:"shafts", type:"lightShafts", layer:1, x:560, y:280, w:1100, h:1000, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:120 },
+  { id:"shafts", type:"lightShafts", layer:1, x:573, y:302, w:1100, h:1000, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:120 },
 
   { id:"coolground", type:"coolGround", layer:2, x:600, y:680, w:1500, h:520, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:120 },
   { id:"log", type:"log", layer:3, x:600, y:612, w:900, h:230, anchor:{ax:.5,ay:.5}, src:null, intro:"settle", delay:260 },
 
-  { id:"glowmush-1", type:"glowMushroom", layer:4, x:300, y:560, w:124, h:144, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1400, idle:"breathe", idleDur:5, idleDelay:.4, opts:{cap:"jade"} },
-  { id:"glowmush-2", type:"glowMushroom", layer:4, x:520, y:560, w:92, h:106, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1600, idle:"breathe", idleDur:5.6, idleDelay:1.1, opts:{cap:"violet"} },
-  { id:"glowmush-3", type:"glowMushroom", layer:4, x:812, y:556, w:108, h:124, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1760, idle:"breathe", idleDur:6, idleDelay:.7, opts:{cap:"jade"} },
+  { id:"glowmush-1", type:"glowMushroom", layer:4, x:287, y:584, w:124, h:144, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1400, idle:"breathe", idleDur:5, idleDelay:.4, opts:{cap:"jade"} },
+  { id:"glowmush-2", type:"glowMushroom", layer:4, x:526, y:556, w:121, h:140, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1600, idle:"breathe", idleDur:5.6, idleDelay:1.1, opts:{cap:"violet"} },
+  { id:"glowmush-3", type:"glowMushroom", layer:4, x:812, y:556, w:131, h:150, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1760, idle:"breathe", idleDur:6, idleDelay:.7, opts:{cap:"jade"} },
   { id:"fern-1", type:"fern", layer:4, x:360, y:566, w:150, h:185, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1500, idle:"sway", idleDur:7, idleDelay:0, opts:{tone:"near"} },
   { id:"fern-2", type:"fern", layer:4, x:470, y:588, w:110, h:140, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1680, idle:"sway", idleDur:6.4, idleDelay:1.1, opts:{tone:"mid"} },
   { id:"fern-3", type:"fern", layer:4, x:884, y:572, w:140, h:172, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1820, idle:"sway", idleDur:7.5, idleDelay:.6, opts:{tone:"near", flip:true} },
 
-  { id:"slug-jade", type:"slug", layer:5, x:440, y:548, w:140, h:96, anchor:{ax:.5,ay:.86}, src:"assets/slug-jade.png", intro:"pop", delay:2000, idle:"breathe", idleDur:5.2, idleDelay:.3, opts:SLUG.jade },
-  { id:"slug-violet", type:"slug", layer:5, x:786, y:560, w:130, h:90, anchor:{ax:.5,ay:.86}, src:"assets/slug-violet.png", intro:"pop", delay:2200, idle:"sway", idleDur:6, idleDelay:1.2, opts:{...SLUG.violet, flip:true} },
-  { id:"slug-pale", type:"slug", layer:5, x:602, y:540, w:110, h:78, anchor:{ax:.5,ay:.86}, src:"assets/slug-pale.png", intro:"pop", delay:2380, idle:"breathe", idleDur:5.8, idleDelay:.8, opts:SLUG.pale },
-  { id:"slug-jade-2", type:"slug", layer:5, x:694, y:520, w:92, h:66, anchor:{ax:.5,ay:.86}, src:"assets/slug-jade.png", intro:"pop", delay:2520, idle:"sway", idleDur:6.4, idleDelay:1.9, opts:{...SLUG.jade, flip:true} },
+  { id:"slug-jade", type:"slug", layer:5, x:319, y:691, w:246, h:171, anchor:{ax:.5,ay:.86}, src:"assets/slug-jade.png", intro:"pop", delay:2000, idle:"breathe", idleDur:5.2, idleDelay:.3, opts:SLUG.jade },
+  { id:"slug-violet", type:"slug", layer:5, x:731, y:641, w:147, h:103, anchor:{ax:.5,ay:.86}, src:"assets/slug-violet.png", intro:"pop", delay:2200, idle:"sway", idleDur:6, idleDelay:1.2, opts:{...SLUG.violet, flip:true} },
+  { id:"slug-pale", type:"slug", layer:5, x:509, y:629, w:171, h:119, anchor:{ax:.5,ay:.86}, src:"assets/slug-pale.png", intro:"pop", delay:2380, idle:"breathe", idleDur:5.8, idleDelay:.8, opts:SLUG.pale },
+  { id:"slug-jade-2", type:"slug", layer:5, x:889, y:666, w:172, h:122, anchor:{ax:.5,ay:.86}, src:"assets/slug-jade.png", intro:"pop", delay:2520, idle:"sway", idleDur:6.4, idleDelay:1.9, opts:{...SLUG.jade, flip:true} },
 
-  { id:"leaf", type:"foreignLeaf", layer:6, x:648, y:444, w:430, h:210, anchor:{ax:.5,ay:.5}, src:null, intro:"leaf", delay:3000, idle:"sway", idleDur:7.5, idleDelay:.2 },
+  { id:"leaf", type:"foreignLeaf", layer:6, x:587, y:707, rot:345, w:430, h:210, anchor:{ax:.5,ay:.5}, src:null, intro:"leaf", delay:3000, idle:"sway", idleDur:7.5, idleDelay:.2 },
 
-  { id:"protagonist", type:"snail", layer:7, x:0, y:0, w:158, h:140, anchor:{ax:.5,ay:.82},
-    src:HERO_SRC_B, intro:"fade", delay:4700, idle:"breathePulse", idleDur:4.2, idleDelay:0, opts:{...SHELL.amber, hero:true},
-    path:"M 500 470 C 585 450, 665 434, 735 420 C 786 410, 820 407, 848 408" },
+  { id:"protagonist", type:"snail", layer:7, x:848, y:408, rot:335, w:158, h:140, anchor:{ax:.5,ay:.82},
+    src:HERO_SRC_B, intro:"fade", delay:4700, idle:"breathePulse", idleDur:4.2, idleDelay:0, opts:{...SHELL.amber, hero:true, flip:true},
+    path:"M 480 753 C 424 729, 504 713, 574 699 C 625 689, 659 686, 687 687" },
 
   { id:"frond-fg-l", type:"fern", layer:8, x:210, y:700, w:300, h:340, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1300, idle:"sway", idleDur:9, idleDelay:.5, opts:{tone:"far"} },
   { id:"frond-fg-r", type:"fern", layer:8, x:1000, y:710, w:320, h:360, anchor:{ax:.5,ay:1}, src:null, intro:"pop", delay:1450, idle:"sway", idleDur:10, idleDelay:1.6, opts:{tone:"far", flip:true} },
