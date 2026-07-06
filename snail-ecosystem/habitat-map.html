@@ -193,6 +193,7 @@ html, body {
   object-fit: cover;
   display: none;
   will-change: transform;
+  transition: opacity 0.2s ease;  /* soft reveal once the new frame is decoded */
 }
 
 #popup-img-placeholder {
@@ -672,9 +673,20 @@ let hideTimer = null;
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 buildMap(CONFIG);
+preloadZoomedImages(CONFIG);
 
 // ── Build ──────────────────────────────────────────────────────────────────
 function asset(path) { return path ? ASSET_BASE + path : path; }
+
+// Warm the browser cache with every zoomed frame right after load, so the
+// first hover on each hotspot paints instantly instead of after a download.
+function preloadZoomedImages(cfg) {
+  (cfg.hotspots || []).forEach(hs => {
+    if (!hs.zoomedImage) return;
+    const im = new Image();
+    im.src = asset(hs.zoomedImage);
+  });
+}
 
 function buildMap(cfg) {
   setLandscape(cfg.landscape);
@@ -760,14 +772,21 @@ function showPopup(hs, el) {
     }
     popupVideo.play().catch(() => {});
   } else if (hs.zoomedImage) {
+    const src = asset(hs.zoomedImage);
     popupVideo.style.display  = 'none';
-    popupImg.style.display    = 'block';
     popupImgPh.style.display  = 'none';
+    popupImg.style.display    = 'block';
+    // Hide during the swap so we never flash the previous hotspot's image;
+    // reveal only once the new frame is decoded and ready to paint.
+    popupImg.style.opacity = '0';
     popupImg.onerror = () => {
       popupImg.style.display   = 'none';
       popupImgPh.style.display = 'flex';
     };
-    popupImg.src = asset(hs.zoomedImage);
+    popupImg.src = src;
+    const reveal = () => { popupImg.style.opacity = '1'; };
+    if (popupImg.decode) popupImg.decode().then(reveal).catch(reveal);
+    else reveal();
   } else {
     popupVideo.style.display  = 'none';
     popupImg.style.display    = 'none';
