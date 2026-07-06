@@ -156,14 +156,19 @@ html, body {
   overflow: visible;
   z-index: 200;
   opacity: 0;
-  transform: scale(0.9) translateY(12px);
+  /* --ps (popup scale) is set by JS so the whole popup shrinks to fit small
+     viewports as one unit — every child offset scales with it. Pivot from the
+     top-left so JS can place it by its content box. */
+  --ps: 1;
+  transform-origin: top left;
+  transform: scale(calc(var(--ps) * 0.9));
   transition: opacity 0.26s ease, transform 0.26s ease;
   pointer-events: none;
 }
 
 #popup.visible {
   opacity: 1;
-  transform: scale(1) translateY(0);
+  transform: scale(var(--ps));
   pointer-events: all;
   /* Drop-shadows compose on the already-rendered blob shape, so the glow follows the morphed edge */
   filter:
@@ -670,6 +675,8 @@ const CONFIG = {
 // ── State ──────────────────────────────────────────────────────────────────
 let pinned    = false;  // click-to-pin: popup stays open when mouse leaves
 let hideTimer = null;
+let openHs    = null;   // hotspot data of the currently open popup
+let openEl    = null;   // hotspot element of the currently open popup
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 buildMap(CONFIG);
@@ -799,41 +806,70 @@ function showPopup(hs, el) {
   applyTextBlobOffset(hs);   // this hotspot's own position, re-synced on every open
   popupTextBlob.classList.add('visible');
 
-  positionPopup(el);
+  openHs = hs;
+  openEl = el;
+  positionPopup(hs, el);
 
   document.querySelectorAll('.hotspot.active').forEach(h => h.classList.remove('active'));
   el.classList.add('active');
   popup.classList.add('visible');
 }
 
-function positionPopup(hotspotEl) {
-  const POPUP_W  = 640;
-  const POPUP_H  = 520;
-  const GAP      = 16;
-  const MARGIN   = 10;
+// Fixed geometry of the popup's two blobs, in the popup's own coordinate space.
+// The image blob sits at 0,0; the text blob is placed per-hotspot and often
+// overhangs the 640×520 box, so the real content is wider than the box.
+const IMG_W = 480, IMG_H = 480;   // image blob (.popup-image-wrap)
+const TB_W  = 470, TB_H  = 300;   // text blob (#popup-text-blob)
 
-  const r  = hotspotEl.getBoundingClientRect();
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  const cx = r.left + r.width  / 2;
-  const cy = r.top  + r.height / 2;
+// Union bounding box of both blobs for this hotspot (may start at negative x
+// when the text blob is offset to the left, e.g. the Duskbanders).
+function contentFootprint(hs) {
+  const tb   = (hs && hs.textBlobOffset) ? hs.textBlobOffset : { x: 180, y: 240 };
+  const minX = Math.min(0, tb.x);
+  const minY = Math.min(0, tb.y);
+  const maxX = Math.max(IMG_W, tb.x + TB_W);
+  const maxY = Math.max(IMG_H, tb.y + TB_H);
+  return { minX, minY, w: maxX - minX, h: maxY - minY };
+}
 
-  // Prefer right side; fall back to left if too close to right edge
-  let left = cx < vw / 2
-    ? r.right  + GAP
-    : r.left   - POPUP_W - GAP;
+function positionPopup(hs, hotspotEl) {
+  const GAP = 16;
+  const vw  = window.innerWidth;
+  const vh  = window.innerHeight;
 
-  // Prefer aligning top to hotspot top; fall back to bottom-align if low on screen
-  let top = cy < vh / 2
-    ? r.top
-    : r.bottom - POPUP_H;
+  const fp = contentFootprint(hs);
 
-  // Clamp to viewport margins
-  left = Math.max(MARGIN, Math.min(left, vw - POPUP_W - MARGIN));
-  top  = Math.max(MARGIN, Math.min(top,  vh - POPUP_H - MARGIN));
+  // How much we must shrink so the full content fits the viewport (never > 1).
+  const s = Math.min(1, (vw - 24) / fp.w, (vh - 24) / fp.h);
+  popup.style.setProperty('--ps', s);
 
-  popup.style.left = left + 'px';
-  popup.style.top  = top  + 'px';
+  if (s >= 0.999) {
+    // Fits at full size → keep the original beside-the-hotspot placement so
+    // the desktop layout the offsets were tuned on is unchanged.
+    const POPUP_W = 640, POPUP_H = 520, MARGIN = 10;
+    const r  = hotspotEl.getBoundingClientRect();
+    const cx = r.left + r.width  / 2;
+    const cy = r.top  + r.height / 2;
+    let left = cx < vw / 2 ? r.right + GAP : r.left - POPUP_W - GAP;
+    let top  = cy < vh / 2 ? r.top          : r.bottom - POPUP_H;
+    left = Math.max(MARGIN, Math.min(left, vw - POPUP_W - MARGIN));
+    top  = Math.max(MARGIN, Math.min(top,  vh - POPUP_H - MARGIN));
+    popup.style.left = left + 'px';
+    popup.style.top  = top  + 'px';
+    return;
+  }
+
+  // Too big for this viewport → scale down and center the content as an
+  // overlay, clamped so nothing spills off-screen (phones, small embeds).
+  const MARGIN = 12;
+  const cw = fp.w * s, ch = fp.h * s;
+  let contentX = (vw - cw) / 2;
+  let contentY = (vh - ch) / 2;
+  contentX = Math.max(MARGIN, Math.min(contentX, vw - MARGIN - cw));
+  contentY = Math.max(MARGIN, Math.min(contentY, vh - MARGIN - ch));
+  // Back out the scaled content offset (top-left transform-origin → exact).
+  popup.style.left = (contentX - fp.minX * s) + 'px';
+  popup.style.top  = (contentY - fp.minY * s) + 'px';
 }
 
 function hidePopup() {
@@ -843,7 +879,16 @@ function hidePopup() {
   popupTextBlob.classList.remove('visible');
   document.querySelectorAll('.hotspot.active').forEach(h => h.classList.remove('active'));
   pinned = false;
+  openHs = null;
+  openEl = null;
 }
+
+// Re-fit the popup if the viewport changes while it's open (rotate, resize).
+window.addEventListener('resize', () => {
+  if (openHs && openEl && popup.classList.contains('visible')) {
+    positionPopup(openHs, openEl);
+  }
+});
 
 function scheduleHide() {
   if (pinned) return;
