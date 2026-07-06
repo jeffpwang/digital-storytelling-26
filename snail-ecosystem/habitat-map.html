@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Habitat Map</title>
+<!-- Lora — warm literary serif for the text blob (loaded from Google Fonts CDN) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400;1,500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: #1a2a1a;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* ── Map container ─────────────────────────────────────────────────────── */
+#map-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Landscape layer ───────────────────────────────────────────────────── */
+#landscape-layer {
+  position: absolute;
+  inset: 0;
+}
+
+#landscape-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+#landscape-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: none; /* shown by JS once the real image loads */
+}
+
+/* ── Hotspot layer ─────────────────────────────────────────────────────── */
+#hotspots-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none; /* layer passthrough; individual hotspots re-enable */
+}
+
+/* ── Hotspot marker ────────────────────────────────────────────────────── */
+.hotspot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: all;
+  cursor: pointer;
+}
+
+.hotspot-ring {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.65);
+  background: rgba(22, 36, 20, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: hs-pulse 2.6s ease-in-out infinite;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+/* Snail portrait inside the ring */
+.hotspot-snail {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.18s ease;
+}
+
+.hotspot-snail .snail-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: none;
+}
+
+.hotspot-snail-placeholder {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hotspot-label {
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.9), 0 0 12px rgba(0, 0, 0, 0.7);
+  opacity: 0;
+  transition: opacity 0.2s ease, top 0.18s ease;
+  pointer-events: none;
+}
+
+/* hover & active states */
+.hotspot:hover .hotspot-ring,
+.hotspot.active .hotspot-ring {
+  animation: none;
+  border-color: rgba(255, 255, 255, 0.95);
+  background: rgba(22, 36, 20, 0.90);
+  transform: scale(1.25);
+}
+
+.hotspot:hover .hotspot-snail,
+.hotspot.active .hotspot-snail {
+  transform: scale(1.1);
+}
+
+.hotspot:hover .hotspot-label,
+.hotspot.active .hotspot-label {
+  opacity: 1;
+  top: calc(100% + 16px);
+}
+
+@keyframes hs-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.3); }
+  55%       { box-shadow: 0 0 0 18px rgba(255, 255, 255, 0); }
+}
+
+/* ── Popup (storybook illustration) ───────────────────────────────────── */
+#popup {
+  position: fixed;
+  width: 640px;
+  height: 520px;
+  background: transparent;
+  border: none;
+  overflow: visible;
+  z-index: 200;
+  opacity: 0;
+  transform: scale(0.9) translateY(12px);
+  transition: opacity 0.26s ease, transform 0.26s ease;
+  pointer-events: none;
+}
+
+#popup.visible {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  pointer-events: all;
+  /* Drop-shadows compose on the already-rendered blob shape, so the glow follows the morphed edge */
+  filter:
+    drop-shadow(0 0 1px rgba(240, 235, 228, 0.88))
+    drop-shadow(0 0 12px rgba(235, 228, 215, 0.38));
+}
+
+/* The illustration — mask defines the soft circle, filter warps it into a shifting blob */
+.popup-image-wrap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 480px;
+  height: 480px;
+  overflow: visible;
+  -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 42%, transparent 68%);
+          mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 42%, transparent 68%);
+  filter: url(#blob-morph);
+}
+
+#popup-img,
+#popup-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: none;
+  will-change: transform;
+}
+
+#popup-img-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  background: radial-gradient(ellipse at 50% 40%, #3e5c32 0%, #1a2a1a 100%);
+}
+
+.placeholder-icon {
+  width: 28px;
+  height: 28px;
+  opacity: 0.2;
+}
+
+.placeholder-label {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.2);
+}
+
+/* Text hidden — image is the focus for now */
+.popup-body {
+  display: none;
+}
+
+#popup-label {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 13px;
+  font-weight: normal;
+  font-style: italic;
+  letter-spacing: 0.01em;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.9), 0 0 24px rgba(0, 0, 0, 0.6);
+  margin-bottom: 6px;
+}
+
+#popup-description {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 11px;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.5);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.85);
+}
+
+#popup-fact {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.28);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+  margin-top: 8px;
+  padding-top: 0;
+  border-top: none;
+}
+
+/* ── Text blob ─────────────────────────────────────────────────────────── */
+/* Wrapper — no filter here so text is never distorted */
+#popup-text-blob {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 470px;
+  height: 300px;
+  overflow: visible;
+  opacity: 0;
+  transform: scale(0.88) translate(8px, 6px);
+  transition: opacity 0.28s ease 0.12s, transform 0.28s ease 0.12s;
+  pointer-events: none;
+}
+#popup-text-blob.visible {
+  opacity: 1;
+  transform: scale(1) translate(0, 0);
+  pointer-events: all;
+}
+
+/* This element gets the filter+mask — background only, no text inside */
+#popup-text-blob-bg {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 252, 248, 0.90);
+  -webkit-mask-image: radial-gradient(ellipse 82% 76% at 50% 50%, black 60%, transparent 84%);
+          mask-image: radial-gradient(ellipse 82% 76% at 50% 50%, black 60%, transparent 84%);
+  filter: url(#blob-morph-text);
+}
+
+/* Text lives as a sibling above the filtered bg — never filtered, never distorted */
+.text-blob-inner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 46px 68px;
+  text-align: center;
+  z-index: 1;
+}
+
+.text-blob-desc {
+  font-family: 'Lora', Georgia, 'Times New Roman', serif;
+  font-size: 16px;
+  line-height: 1.7;
+  color: rgba(28, 24, 18, 0.84);
+  font-style: italic;
+  margin: 0;
+}
+
+</style>
+</head>
+<body>
+
+<div id="map-container">
+
+  <!-- ── Landscape layer ────────────────────────────────────────────────
+       SVG placeholder is always present. When CONFIG.landscape.image is set
+       (see the script block below) and the file loads, it overlays this.  -->
+  <div id="landscape-layer">
+
+    <svg id="landscape-svg" viewBox="0 0 1000 600"
+         preserveAspectRatio="xMidYMid slice"
+         xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="waterGrad" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"   stop-color="#24516a"/>
+          <stop offset="70%"  stop-color="#356882"/>
+          <stop offset="100%" stop-color="#3e7a92"/>
+        </radialGradient>
+        <radialGradient id="forestVignette" cx="50%" cy="50%" r="70%">
+          <stop offset="0%"   stop-color="#324f32"/>
+          <stop offset="100%" stop-color="#1c2e1c"/>
+        </radialGradient>
+      </defs>
+
+      <!-- Forest floor -->
+      <rect width="1000" height="600" fill="url(#forestVignette)"/>
+
+      <!-- Canopy texture — darker blobs suggesting dense tree cover -->
+      <ellipse cx="860" cy="95"  rx="120" ry="82"  fill="#1e2e1e" opacity="0.75"/>
+      <ellipse cx="95"  cy="490" rx="130" ry="78"  fill="#1e2e1e" opacity="0.75"/>
+      <ellipse cx="780" cy="495" rx="115" ry="72"  fill="#1e2e1e" opacity="0.72"/>
+      <ellipse cx="500" cy="540" rx="160" ry="55"  fill="#233523" opacity="0.65"/>
+      <ellipse cx="50"  cy="130" rx="90"  ry="65"  fill="#1e2e1e" opacity="0.7"/>
+      <ellipse cx="940" cy="350" rx="75"  ry="95"  fill="#1e2e1e" opacity="0.65"/>
+
+      <!-- Zone 3: East Meadow base — Emberbacks (warm sun-baked, light) -->
+      <ellipse cx="718" cy="212" rx="98"  ry="68"  fill="#8a9e38" opacity="0.55"/>
+      <ellipse cx="715" cy="208" rx="66"  ry="46"  fill="#a0b840" opacity="0.35"/>
+      <ellipse cx="703" cy="200" rx="20"  ry="11"  fill="#b0b040" opacity="0.25" transform="rotate(-15, 703, 200)"/>
+      <ellipse cx="736" cy="220" rx="18"  ry="10"  fill="#a8a838" opacity="0.22" transform="rotate(10, 736, 220)"/>
+
+      <!-- Zone 2: Northwest Log base — Fernclingers (rich emerald, lush) -->
+      <ellipse cx="245" cy="165" rx="70"  ry="50"  fill="#2a5e1e" opacity="0.6"/>
+
+      <!-- Zone 6: West Bank base — Chalkspires (pale exposed clay, light) -->
+      <ellipse cx="215" cy="332" rx="55"  ry="38"  fill="#c4b498" opacity="0.48"/>
+
+      <!-- Central water body -->
+      <path d="
+        M 392,228
+        C 422,207 462,198 508,206
+        C 554,214 582,236 594,264
+        C 606,292 600,326 586,352
+        C 572,378 548,396 516,403
+        C 484,410 450,406 424,392
+        C 396,378 374,352 365,320
+        C 356,288 360,256 375,238
+        Z
+      " fill="url(#waterGrad)"/>
+
+      <!-- Water shimmer highlight -->
+      <path d="
+        M 425,242
+        C 448,228 478,222 508,228
+        C 538,234 558,252 563,274
+        C 566,286 558,300 542,308
+        C 524,317 498,320 474,313
+        C 451,306 433,290 426,272
+        C 418,255 415,248 425,242
+        Z
+      " fill="#5a9ab8" opacity="0.3"/>
+
+      <!-- Zone 1: North Shore Rocks — Mosswhorls (cool permanent shade, wet granite) -->
+      <!-- deep shadow pool beneath overhang -->
+      <ellipse cx="428" cy="94" rx="72" ry="30" fill="#1a2634" opacity="0.72"/>
+      <!-- blue-gray wet granite slabs -->
+      <polygon points="400,78 426,68 452,74 462,92 448,107 420,108 399,97"
+               fill="#3e4a5a" opacity="0.95"/>
+      <polygon points="428,96 450,88 465,94 467,108 452,115 432,111"
+               fill="#4a5668" opacity="0.88"/>
+      <ellipse cx="390" cy="88" rx="14" ry="10"
+               fill="#384450" transform="rotate(-12, 390, 88)" opacity="0.88"/>
+      <!-- dark algae on wet surface -->
+      <ellipse cx="436" cy="87" rx="18" ry="8" fill="#213628" opacity="0.65" transform="rotate(-5, 436, 87)"/>
+      <ellipse cx="413" cy="97" rx="11" ry="6" fill="#1c3020" opacity="0.58" transform="rotate(8, 413, 97)"/>
+
+      <!-- Zone 2: Northwest Log — Fernclingers (fern-swallowed, rich emerald) -->
+      <!-- fern mass base -->
+      <ellipse cx="248" cy="170" rx="58" ry="38" fill="#2a5a1e" opacity="0.7"/>
+      <!-- layered fern fronds — overlapping, bright emerald -->
+      <ellipse cx="236" cy="160" rx="42" ry="17" fill="#387028" opacity="0.8" transform="rotate(-30, 236, 160)"/>
+      <ellipse cx="262" cy="156" rx="38" ry="15" fill="#427830" opacity="0.78" transform="rotate(15, 262, 156)"/>
+      <ellipse cx="248" cy="174" rx="46" ry="13" fill="#386825" opacity="0.72" transform="rotate(-10, 248, 174)"/>
+      <ellipse cx="226" cy="170" rx="28" ry="11" fill="#487a2c" opacity="0.68" transform="rotate(-44, 226, 170)"/>
+      <!-- log core barely visible under fern coverage -->
+      <ellipse cx="248" cy="173" rx="40" ry="7" fill="#4a3818" transform="rotate(-22, 248, 173)" opacity="0.42"/>
+      <!-- bright frond tips -->
+      <ellipse cx="268" cy="149" rx="18" ry="7" fill="#588c36" opacity="0.58" transform="rotate(20, 268, 149)"/>
+      <ellipse cx="228" cy="155" rx="16" ry="7" fill="#548830" opacity="0.55" transform="rotate(-40, 228, 155)"/>
+
+      <!-- Zone 4: Southeast Rocks — Duskbanders (transitional: sun-warmed stone + fern shadow) -->
+      <!-- sun-warmed stone — notably warmer/tan than Zone 1's cool rocks -->
+      <polygon points="618,368 656,358 682,364 688,386 670,402 636,400 614,385"
+               fill="#7a6e50" opacity="0.92"/>
+      <polygon points="654,386 674,378 690,385 691,402 675,410 656,406"
+               fill="#8a7e5c" opacity="0.82"/>
+      <ellipse cx="610" cy="382" rx="14" ry="10"
+               fill="#6a6048" transform="rotate(10, 610, 382)" opacity="0.85"/>
+      <!-- fern shadow creeping in from upper edge — the "belonging to neither side" split -->
+      <ellipse cx="680" cy="366" rx="34" ry="20" fill="#264820" opacity="0.68" transform="rotate(-18, 680, 366)"/>
+      <ellipse cx="692" cy="380" rx="26" ry="17" fill="#1e3c1a" opacity="0.62" transform="rotate(-8, 692, 380)"/>
+      <!-- transition overlap zone — half-lit, half-shadow -->
+      <ellipse cx="662" cy="376" rx="24" ry="14" fill="#3a5828" opacity="0.42" transform="rotate(-25, 662, 376)"/>
+
+      <!-- Zone 5: South Inlet — Tideglass (flood-prone, pale and waterlogged) -->
+      <!-- marshy floodplain spreading wide at the stream's mouth — pale blue-green -->
+      <ellipse cx="432" cy="462" rx="52" ry="24" fill="#6aaa9e" opacity="0.42"/>
+      <ellipse cx="428" cy="442" rx="34" ry="20" fill="#5e9c92" opacity="0.4"/>
+      <!-- waterlogged moss patches on saturated soil -->
+      <ellipse cx="412" cy="452" rx="17" ry="11" fill="#58988a" opacity="0.48" transform="rotate(-15, 412, 452)"/>
+      <ellipse cx="452" cy="446" rx="15" ry="10" fill="#609290" opacity="0.44" transform="rotate(10, 452, 446)"/>
+      <!-- stream channel — pale, almost sky-colored -->
+      <path d="M 432,484 C 434,466 436,448 432,430 C 429,416 428,406 434,400 C 439,395 447,397 450,406"
+            fill="none" stroke="#5a8e9a" stroke-width="20" stroke-linecap="round" opacity="0.62"/>
+      <path d="M 432,484 C 434,466 436,448 432,430 C 429,416 428,406 434,400 C 439,395 447,397 450,406"
+            fill="none" stroke="#8ac8d4" stroke-width="8"  stroke-linecap="round" opacity="0.42"/>
+
+      <!-- Zone 6: West Bank — Chalkspires (eroding clay, pale exposed soil) -->
+      <!-- pale chalk bank face — notably lighter than all surrounding zones -->
+      <ellipse cx="220" cy="334" rx="44" ry="28" fill="#c8b898" opacity="0.78"/>
+      <ellipse cx="240" cy="321" rx="30" ry="19" fill="#d4c8a8" opacity="0.72"/>
+      <ellipse cx="206" cy="342" rx="24" ry="15" fill="#beb090" opacity="0.68"/>
+      <!-- exposed root lines in pale soil -->
+      <path d="M 192,327 C 207,321 220,325 230,332 C 238,338 240,351 232,354"
+            fill="none" stroke="#7a6444" stroke-width="2.5" opacity="0.65" stroke-linecap="round"/>
+      <path d="M 214,317 C 220,324 224,332 222,342"
+            fill="none" stroke="#7a6444" stroke-width="2"   opacity="0.52" stroke-linecap="round"/>
+      <path d="M 237,315 C 241,323 243,332 239,340"
+            fill="none" stroke="#6a5438" stroke-width="2"   opacity="0.48" stroke-linecap="round"/>
+      <!-- crumbling edge fragments -->
+      <ellipse cx="196" cy="338" rx="11" ry="7" fill="#b8a882" opacity="0.58" transform="rotate(-14, 196, 338)"/>
+      <ellipse cx="254" cy="327" rx="9"  ry="6" fill="#c8b898" opacity="0.52" transform="rotate(12, 254, 327)"/>
+    </svg>
+
+    <!-- Real landscape image; shown when CONFIG.landscape.image loads -->
+    <img id="landscape-img" alt="Aerial landscape view">
+
+  </div><!-- /landscape-layer -->
+
+  <!-- Hotspot markers injected by JS -->
+  <div id="hotspots-layer"></div>
+
+  <!-- Popup card -->
+  <div id="popup" role="dialog" aria-live="polite">
+    <div class="popup-image-wrap">
+      <img id="popup-img" alt="">
+      <video id="popup-video" loop muted playsinline></video>
+      <div id="popup-img-placeholder">
+        <!-- leaf icon -->
+        <svg class="placeholder-icon" viewBox="0 0 32 32" fill="none"
+             xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M16 4 C16 4 26 8 26 18 C26 25 21 28 16 28
+                   C11 28 6 25 6 18 C6 8 16 4 16 4 Z"
+                stroke="white" stroke-width="1.5" fill="none"/>
+          <line x1="16" y1="4" x2="16" y2="28" stroke="white" stroke-width="1"/>
+          <path d="M16 14 C20 12 23 14 24 17" stroke="white" stroke-width="1" fill="none"/>
+          <path d="M16 19 C12 17 9 19 8 22" stroke="white" stroke-width="1" fill="none"/>
+        </svg>
+        <span class="placeholder-label">Zone image</span>
+      </div>
+    </div>
+    <!-- Text blob — filtered bg and unfiltered text are siblings so text is never distorted -->
+    <div id="popup-text-blob">
+      <div id="popup-text-blob-bg"></div>
+      <div class="text-blob-inner">
+        <p class="text-blob-desc" id="popup-desc-text"></p>
+      </div>
+    </div>
+
+    <div class="popup-body">
+      <h2 id="popup-label"></h2>
+      <p  id="popup-description"></p>
+      <p  id="popup-fact"></p>
+    </div>
+  </div>
+
+</div><!-- /map-container -->
+
+<!--
+  Blob morph filter — three-stage pipeline:
+  1. Displace the full source (creates the morphing edge)
+  2. Build a center shield: erode the source alpha inward, then blur to soften it
+  3. Composite original (undisplaced) back on top in the center only
+  Result: edges shift organically, center stays sharp and readable.
+-->
+<svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true"
+     xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="blob-morph" x="-40%" y="-40%" width="180%" height="180%"
+            color-interpolation-filters="linearRGB">
+
+      <!-- Stage 1: turbulence noise, slowly evolving -->
+      <feTurbulence type="fractalNoise"
+                    baseFrequency="0.009 0.007"
+                    numOctaves="3"
+                    seed="2"
+                    result="noise">
+        <animate attributeName="baseFrequency"
+                 values="0.009 0.007; 0.013 0.010; 0.007 0.012; 0.011 0.008; 0.009 0.007"
+                 dur="22s" calcMode="linear" repeatCount="indefinite"/>
+      </feTurbulence>
+
+      <!-- Stage 2: displace the full source — this warps the edge into a blob -->
+      <feDisplacementMap in="SourceGraphic" in2="noise"
+                         xChannelSelector="R" yChannelSelector="G"
+                         result="displaced">
+        <animate attributeName="scale"
+                 values="48; 66; 40; 58; 50; 48"
+                 dur="14s" calcMode="linear" repeatCount="indefinite"/>
+      </feDisplacementMap>
+
+      <!-- Stage 3a: shrink the source alpha inward to isolate the solid center -->
+      <feMorphology in="SourceAlpha" operator="erode" radius="55" result="erodedCore"/>
+      <!-- Stage 3b: blur to make the shield boundary soft, not hard -->
+      <feGaussianBlur in="erodedCore" stdDeviation="28" result="centerShield"/>
+
+      <!-- Stage 3c: cut the original (undisplaced) source to just the center shield -->
+      <feComposite in="SourceGraphic" in2="centerShield" operator="in" result="coreImage"/>
+
+      <!-- Final merge: displaced blob underneath, original center on top -->
+      <feMerge>
+        <feMergeNode in="displaced"/>
+        <feMergeNode in="coreImage"/>
+      </feMerge>
+    </filter>
+
+    <!-- Second filter for the text blob — different seed + timing so they morph independently -->
+    <filter id="blob-morph-text" x="-40%" y="-40%" width="180%" height="180%"
+            color-interpolation-filters="linearRGB">
+      <feTurbulence type="fractalNoise"
+                    baseFrequency="0.012 0.009"
+                    numOctaves="3"
+                    seed="5"
+                    result="noise">
+        <animate attributeName="baseFrequency"
+                 values="0.012 0.009; 0.016 0.012; 0.009 0.014; 0.013 0.010; 0.012 0.009"
+                 dur="17s" calcMode="linear" repeatCount="indefinite"/>
+      </feTurbulence>
+      <feDisplacementMap in="SourceGraphic" in2="noise"
+                         xChannelSelector="R" yChannelSelector="G"
+                         result="displaced">
+        <animate attributeName="scale"
+                 values="32; 44; 26; 38; 34; 32"
+                 dur="11s" calcMode="linear" repeatCount="indefinite"/>
+      </feDisplacementMap>
+      <feMorphology in="SourceAlpha" operator="erode" radius="36" result="erodedCore"/>
+      <feGaussianBlur in="erodedCore" stdDeviation="18" result="centerShield"/>
+      <feComposite in="SourceGraphic" in2="centerShield" operator="in" result="coreImage"/>
+      <feMerge>
+        <feMergeNode in="displaced"/>
+        <feMergeNode in="coreImage"/>
+      </feMerge>
+    </filter>
+  </defs>
+</svg>
+
+<script>
+// ── Data ─────────────────────────────────────────────────────────────────
+// Everything is hardcoded here — no external JSON, no server needed. This file
+// is fully self-contained: open it directly, commit it to Git, or embed it in
+// WordPress via an <iframe>.
+//
+// ASSET_BASE is prepended to every image path. Images live in ./web-assets/,
+// committed alongside this file, so they're served same-origin from GitHub
+// Pages (and work locally + offline). No external hosting needed.
+const ASSET_BASE = 'web-assets/';
+
+const CONFIG = {
+  landscape: {
+    image: 'snail-background.jpg',
+    alt: 'Aerial view of a wooded pond, home to six snail tribes',
+  },
+  hotspots: [
+    {
+      id: 'north-rocks',
+      label: 'North Shore Rocks — The Mosswhorls',
+      tribe: 'Mosswhorls',
+      fact: 'Mosswhorls can seal their shells shut and go completely dormant for days at a time, waiting out cold or dry spells without food or water.',
+      description: "Cool granite in permanent shade, the Mosswhorls wear shells so dark they vanish into the wet stone. Patient and slow-moving, they're rarely bothered by much of anything.",
+      x: 23.5, y: 17.5,
+      zoomedImage: 'mosswhorls_firstFrame.jpg',
+      snailImage: 'mosswhorls.png',
+      imageOffset:    { x: 8.734375, y: 5.41796875 },
+      textBlobOffset: { x: 506.203125, y: 97.14453125 },
+    },
+    {
+      id: 'northwest-log',
+      label: 'Northwest Log — The Fernclingers',
+      tribe: 'Fernclingers',
+      fact: "Fernclingers' mottled shells break up their outline so well that most predators walk right past them without noticing.",
+      description: 'Moss and fern have swallowed this log almost whole, and so have the Fernclingers living in its folds. Shy and private, they keep close to cover and rarely stray.',
+      x: 31.3, y: 47,
+      zoomedImage: 'fernClingers_firstFrame.jpg',
+      snailImage: 'fernclingers.png',
+      imageOffset:    { x: -44.953125, y: -31.81640625 },
+      textBlobOffset: { x: 477.45703125, y: 50.11328125 },
+    },
+    {
+      id: 'east-meadow',
+      label: 'East Meadow — The Emberbacks',
+      tribe: 'Emberbacks',
+      fact: "Emberbacks' dark amber shells absorb so much heat during the day that they're still warm — and still moving — long after the sun goes down.",
+      description: 'Full sun all afternoon has baked this clearing warm, and the Emberbacks wear it proudly — bold, wide-banded shells that stand out against the grass.',
+      x: 68.1, y: 33,
+      zoomedImage: 'emberback_firstFrame.jpg',
+      snailImage: 'emberback.png',
+      imageOffset:    { x: 0, y: 0 },
+      textBlobOffset: { x: 499.61328125, y: 128.6640625 },
+    },
+    {
+      id: 'southeast-rocks',
+      label: 'Southeast Rocks — The Duskbanders',
+      tribe: 'Duskbanders',
+      fact: 'Duskbanders can find their way back to the exact same resting spot on a rock even after wandering meters away — an unusually strong homing instinct for a snail.',
+      description: 'Where the sun-warmed stone gives way to fern shadow, the Duskbanders have made their home — belonging fully to neither side. Their shells are half-banded, half-mottled, a pattern that reads like a border.',
+      x: 85.5, y: 53.8,
+      zoomedImage: 'duskbander_firstFrame.jpg',
+      snailImage: 'duskbander.png',
+      imageOffset:    { x: 42.1640625, y: 19.375 },
+      textBlobOffset: { x: -479.3359375, y: 107.10546875 },
+    },
+    {
+      id: 'south-inlet',
+      label: 'South Inlet — The Tideglass',
+      tribe: 'Tideglass',
+      fact: 'Tideglass can survive being fully submerged for hours at a time, breathing directly through their skin until the water recedes.',
+      description: "The stream floods this stretch every time it rains, and the Tideglass don't mind one bit. Their pale, almost translucent shells suit the wet, quiet stretch just fine.",
+      x: 50.6, y: 78.7,
+      zoomedImage: 'tideglass_firstFrame.jpg',
+      snailImage: 'tideglass.png',
+      imageOffset:    { x: -10.859375, y: 4.96484375 },
+      textBlobOffset: { x: 506.79296875, y: 83.60546875 },
+    },
+    {
+      id: 'west-bank',
+      label: 'West Bank — The Chalkspires',
+      tribe: 'Chalkspires',
+      fact: 'Chalkspires grip loose, crumbling soil so tightly that they\'re often the last thing left standing after a bank erodes.',
+      description: "This bank erodes a little more with every rain, roots and pale clay laid bare. The Chalkspires' bone-white shells match the exposed soil exactly.",
+      x: 18.5, y: 73.4,
+      zoomedImage: 'chalkspire_firstFrame.jpg',
+      snailImage: 'chalkspire.png',
+      imageOffset:    { x: 13.03125, y: -4.0234375 },
+      textBlobOffset: { x: 522.3828125, y: 79.8359375 },
+    },
+  ],
+};
+
+// ── State ──────────────────────────────────────────────────────────────────
+let pinned    = false;  // click-to-pin: popup stays open when mouse leaves
+let hideTimer = null;
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+buildMap(CONFIG);
+
+// ── Build ──────────────────────────────────────────────────────────────────
+function asset(path) { return path ? ASSET_BASE + path : path; }
+
+function buildMap(cfg) {
+  setLandscape(cfg.landscape);
+  buildHotspots(cfg.hotspots);
+}
+
+function setLandscape(landscape) {
+  if (!landscape || !landscape.image) return;
+  const img = document.getElementById('landscape-img');
+  if (landscape.alt) img.alt = landscape.alt;
+  img.onload  = () => { img.style.display = 'block'; };
+  img.onerror = () => { /* SVG placeholder stays; real image silently absent */ };
+  img.src = asset(landscape.image);
+}
+
+function buildHotspots(hotspots) {
+  const layer = document.getElementById('hotspots-layer');
+  hotspots.forEach(hs => {
+    hs.imageOffset    = hs.imageOffset    || { x: 0, y: 0 };
+    hs.textBlobOffset = hs.textBlobOffset || { x: 180, y: 240 };
+    const el = document.createElement('div');
+    el.className   = 'hotspot';
+    el.dataset.id  = hs.id;
+    el.style.left  = hs.x + '%';
+    el.style.top   = hs.y + '%';
+    el.innerHTML = `
+      <div class="hotspot-ring">
+        <div class="hotspot-snail">
+          <div class="hotspot-snail-placeholder"></div>
+        </div>
+      </div>
+      <span class="hotspot-label">${escapeHTML(hs.label)}</span>
+    `;
+
+    if (hs.snailImage) {
+      const wrap = el.querySelector('.hotspot-snail');
+      const ph   = wrap.querySelector('.hotspot-snail-placeholder');
+      const img  = document.createElement('img');
+      img.className   = 'snail-img';
+      img.alt         = hs.tribe || '';
+      img.style.display = 'none';
+      img.onload  = () => { img.style.display = 'block'; ph.style.display = 'none'; };
+      img.onerror = () => { img.remove(); ph.style.display = 'flex'; };
+      wrap.insertBefore(img, ph);
+      img.src = asset(hs.snailImage);
+    }
+    el.addEventListener('mouseenter', () => { clearHideTimer(); showPopup(hs, el); });
+    el.addEventListener('mouseleave', () => { scheduleHide(); });
+    el.addEventListener('click',      e  => { e.stopPropagation(); togglePin(hs, el); });
+    layer.appendChild(el);
+  });
+}
+
+// ── Popup ──────────────────────────────────────────────────────────────────
+const popup      = document.getElementById('popup');
+const popupImg      = document.getElementById('popup-img');
+const popupVideo    = document.getElementById('popup-video');
+const popupImgPh    = document.getElementById('popup-img-placeholder');
+const popupTextBlob = document.getElementById('popup-text-blob');
+const popupDescText = document.getElementById('popup-desc-text');
+const popupLabel = document.getElementById('popup-label');
+const popupDesc  = document.getElementById('popup-description');
+const popupFact  = document.getElementById('popup-fact');
+
+// Bridge gap: moving mouse from hotspot to popup cancels hide timer
+popup.addEventListener('mouseenter', clearHideTimer);
+popup.addEventListener('mouseleave', scheduleHide);
+
+function showPopup(hs, el) {
+  clearHideTimer();
+
+  popupLabel.textContent = hs.label;
+  popupDesc.textContent  = hs.description || '';
+  popupFact.textContent  = hs.fact || '';
+
+  if (hs.video) {
+    const src = asset(hs.video);
+    popupVideo.style.display  = 'block';
+    popupImg.style.display    = 'none';
+    popupImgPh.style.display  = 'none';
+    if (popupVideo.getAttribute('src') !== src) {
+      popupVideo.src = src;
+    }
+    popupVideo.play().catch(() => {});
+  } else if (hs.zoomedImage) {
+    popupVideo.style.display  = 'none';
+    popupImg.style.display    = 'block';
+    popupImgPh.style.display  = 'none';
+    popupImg.onerror = () => {
+      popupImg.style.display   = 'none';
+      popupImgPh.style.display = 'flex';
+    };
+    popupImg.src = asset(hs.zoomedImage);
+  } else {
+    popupVideo.style.display  = 'none';
+    popupImg.style.display    = 'none';
+    popupImgPh.style.display  = 'flex';
+  }
+  applyImageOffset(hs);
+
+  // Text blob
+  popupDescText.textContent = hs.description || '';
+  applyTextBlobOffset(hs);   // this hotspot's own position, re-synced on every open
+  popupTextBlob.classList.add('visible');
+
+  positionPopup(el);
+
+  document.querySelectorAll('.hotspot.active').forEach(h => h.classList.remove('active'));
+  el.classList.add('active');
+  popup.classList.add('visible');
+}
+
+function positionPopup(hotspotEl) {
+  const POPUP_W  = 640;
+  const POPUP_H  = 520;
+  const GAP      = 16;
+  const MARGIN   = 10;
+
+  const r  = hotspotEl.getBoundingClientRect();
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const cx = r.left + r.width  / 2;
+  const cy = r.top  + r.height / 2;
+
+  // Prefer right side; fall back to left if too close to right edge
+  let left = cx < vw / 2
+    ? r.right  + GAP
+    : r.left   - POPUP_W - GAP;
+
+  // Prefer aligning top to hotspot top; fall back to bottom-align if low on screen
+  let top = cy < vh / 2
+    ? r.top
+    : r.bottom - POPUP_H;
+
+  // Clamp to viewport margins
+  left = Math.max(MARGIN, Math.min(left, vw - POPUP_W - MARGIN));
+  top  = Math.max(MARGIN, Math.min(top,  vh - POPUP_H - MARGIN));
+
+  popup.style.left = left + 'px';
+  popup.style.top  = top  + 'px';
+}
+
+function hidePopup() {
+  popupVideo.pause();
+  popupVideo.currentTime = 0;
+  popup.classList.remove('visible');
+  popupTextBlob.classList.remove('visible');
+  document.querySelectorAll('.hotspot.active').forEach(h => h.classList.remove('active'));
+  pinned = false;
+}
+
+function scheduleHide() {
+  if (pinned) return;
+  hideTimer = setTimeout(hidePopup, 280);
+}
+
+function clearHideTimer() {
+  clearTimeout(hideTimer);
+  hideTimer = null;
+}
+
+function togglePin(hs, el) {
+  if (pinned && el.classList.contains('active')) {
+    // already pinned on this hotspot — unpin and close
+    pinned = false;
+    hidePopup();
+  } else {
+    pinned = true;
+    showPopup(hs, el);
+  }
+}
+
+// ── Global dismiss ─────────────────────────────────────────────────────────
+document.getElementById('map-container').addEventListener('click', e => {
+  if (!e.target.closest('.hotspot') && !e.target.closest('#popup')) {
+    pinned = false;
+    hidePopup();
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { pinned = false; hidePopup(); }
+});
+
+// ── Util ───────────────────────────────────────────────────────────────────
+function escapeHTML(str) {
+  return str.replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ── Popup positioning helpers ───────────────────────────────────────────────
+// Text blob and image framing offsets are baked into CONFIG per hotspot and
+// applied on every open. (They were tuned in the now-removed edit mode.)
+function applyTextBlobOffset(hs) {
+  const off = (hs && hs.textBlobOffset) ? hs.textBlobOffset : null;
+  if (!off) return;
+  popupTextBlob.style.left   = off.x + 'px';
+  popupTextBlob.style.top    = off.y + 'px';
+  popupTextBlob.style.right  = 'auto';
+  popupTextBlob.style.bottom = 'auto';
+}
+
+function applyImageOffset(hs) {
+  const off = (hs && hs.imageOffset) ? hs.imageOffset : { x: 0, y: 0 };
+  const t   = `translate(${off.x}px, ${off.y}px)`;
+  popupImg.style.transform   = t;
+  popupVideo.style.transform = t;
+}
+</script>
+</body>
+</html>

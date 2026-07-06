@@ -1,0 +1,11 @@
+# OS junk
+.DS_Store
+
+# ── snail-ecosystem ──────────────────────────────────────────────────────
+# Keep only the web page + optimized web assets in Git (these are what
+# GitHub Pages serves). Full-res PNG originals, the Premiere project, audio
+# previews, and dev scratch (serve.py, hotspots.json) stay local only.
+# To add a new tracked file under snail-ecosystem/, add a matching '!' rule.
+snail-ecosystem/*
+!snail-ecosystem/habitat-map.html
+!snail-ecosystem/web-assets/
